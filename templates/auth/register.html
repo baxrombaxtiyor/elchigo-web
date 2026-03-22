@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ELCHIGO — Регистрация</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Inter',sans-serif;background:#F2F2F2;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+}
+.wrap{
+  background:#fff;border-radius:20px;padding:44px 40px;
+  width:100%;max-width:440px;
+}
+.logo{display:flex;align-items:center;gap:2px;margin-bottom:32px}
+.logo-elchi{font-family:'Barlow',sans-serif;font-weight:900;font-size:28px;color:#111}
+.logo-go{font-family:'Barlow',sans-serif;font-weight:900;font-size:28px;color:#8B0000}
+.logo-sub{font-size:12px;color:#888;margin-left:6px;margin-top:6px}
+
+h2{font-family:'Barlow',sans-serif;font-size:24px;font-weight:800;margin-bottom:6px}
+.subtitle{font-size:14px;color:#888;margin-bottom:28px}
+
+/* Steps */
+.steps{display:flex;align-items:center;gap:0;margin-bottom:28px}
+.step{display:flex;align-items:center;gap:8px;flex:1}
+.step-num{
+  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-family:'Barlow',sans-serif;font-size:13px;
+  font-weight:800;flex-shrink:0;transition:all .2s;
+  background:#E5E5E5;color:#888;
+}
+.step.active .step-num{background:#8B0000;color:#fff}
+.step.done .step-num{background:#22A06B;color:#fff}
+.step-label{font-size:12px;font-weight:600;color:#888;transition:color .2s}
+.step.active .step-label{color:#8B0000}
+.step.done .step-label{color:#22A06B}
+.step-line{flex:1;height:2px;background:#E5E5E5;margin:0 8px}
+.step-line.done{background:#22A06B}
+
+/* Form */
+.form-group{margin-bottom:16px}
+.form-label{font-size:12px;font-weight:600;color:#888;margin-bottom:6px;display:block}
+.form-input{
+  width:100%;padding:12px 14px;border:none;border-radius:8px;
+  background:#F2F2F2;font-size:14px;font-family:'Inter',sans-serif;
+  outline:none;transition:box-shadow .15s;
+}
+.form-input:focus{box-shadow:0 0 0 2px #8B0000}
+.form-hint{font-size:11px;color:#aaa;margin-top:5px}
+
+.password-strength{height:3px;background:#E5E5E5;border-radius:2px;margin-top:6px;overflow:hidden}
+.strength-bar{height:100%;border-radius:2px;width:0%;transition:width .3s,background .3s}
+
+.btn{
+  width:100%;padding:14px;border:none;border-radius:10px;
+  font-family:'Barlow',sans-serif;font-size:16px;font-weight:700;
+  cursor:pointer;letter-spacing:.5px;transition:all .15s;margin-top:8px;
+}
+.btn-primary{background:#8B0000;color:#fff}
+.btn-primary:hover{background:#6B0000}
+.btn-primary:disabled{background:#ccc;cursor:not-allowed}
+.btn-outline{background:transparent;border:1.5px solid #E5E5E5;color:#111;margin-top:12px}
+.btn-outline:hover{border-color:#111}
+
+.error{
+  background:#CC000010;border:1px solid #CC000030;color:#8B0000;
+  border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;display:none;
+}
+.success{
+  text-align:center;display:none;padding:10px 0;
+}
+.success-icon{
+  width:64px;height:64px;background:#22A06B15;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;margin:0 auto 16px;
+}
+
+.login-link{
+  text-align:center;margin-top:20px;font-size:13px;color:#888;
+}
+.login-link a{color:#8B0000;font-weight:600;text-decoration:none}
+.login-link a:hover{text-decoration:underline}
+
+/* Page panels */
+.panel{display:none}
+.panel.active{display:block}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <span class="logo-elchi">ELCHI</span>
+    <span class="logo-go">GO</span>
+    <span class="logo-sub">Регистрация</span>
+  </div>
+
+  <!-- Steps indicator -->
+  <div class="steps">
+    <div class="step active" id="s1">
+      <div class="step-num">1</div>
+      <div class="step-label">Аккаунт</div>
+    </div>
+    <div class="step-line" id="line1"></div>
+    <div class="step" id="s2">
+      <div class="step-num">2</div>
+      <div class="step-label">Ресторан</div>
+    </div>
+    <div class="step-line" id="line2"></div>
+    <div class="step" id="s3">
+      <div class="step-num">3</div>
+      <div class="step-label">Готово</div>
+    </div>
+  </div>
+
+  <div class="error" id="error-msg"></div>
+
+  <!-- Panel 1: Account -->
+  <div class="panel active" id="panel-1">
+    <h2>Создать аккаунт</h2>
+    <p class="subtitle">Введите данные для входа в систему</p>
+
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="email" placeholder="restaurant@elchigo.uz">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Пароль</label>
+      <input type="password" class="form-input" id="password" placeholder="Минимум 6 символов" oninput="checkStrength(this.value)">
+      <div class="password-strength"><div class="strength-bar" id="strength-bar"></div></div>
+      <div class="form-hint" id="strength-label">Введите пароль</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Повторите пароль</label>
+      <input type="password" class="form-input" id="password2" placeholder="••••••••">
+    </div>
+
+    <button class="btn btn-primary" id="btn-step1" onclick="goStep2()">Далее →</button>
+
+    <div class="login-link">
+      Уже есть аккаунт? <a href="/">Войти</a>
+    </div>
+  </div>
+
+  <!-- Panel 2: Restaurant -->
+  <div class="panel" id="panel-2">
+    <h2>Ваш ресторан</h2>
+    <p class="subtitle">Введите информацию о ресторане</p>
+
+    <div class="form-group">
+      <label class="form-label">Название ресторана</label>
+      <input type="text" class="form-input" id="rest-name" placeholder="Например: Ali Baba Choyxona">
+      <div class="form-hint">Это название будет отображаться в системе</div>
+    </div>
+
+    <button class="btn btn-primary" id="btn-step2" onclick="doRegister()">
+      Зарегистрировать ресторан
+    </button>
+    <button class="btn btn-outline" onclick="goBack()">← Назад</button>
+  </div>
+
+  <!-- Panel 3: Success -->
+  <div class="panel" id="panel-3">
+    <div class="success" style="display:block">
+      <div class="success-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22A06B" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <h2 style="margin-bottom:8px">Готово!</h2>
+      <p style="color:#888;font-size:14px;margin-bottom:24px">
+        Ресторан успешно зарегистрирован.<br>Перенаправляем в панель управления...
+      </p>
+      <div style="width:100%;height:3px;background:#F2F2F2;border-radius:2px;overflow:hidden">
+        <div id="progress-bar" style="height:100%;background:#8B0000;width:0%;transition:width 3s linear"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ⚠️ ЗАМЕНИТЕ НА ВАШИ ДАННЫЕ
+function getCookie(name){
+  const v = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+const firebaseConfig = {
+  apiKey: "AIzaSyBpO6ExODPf-U2pnE-SQ7g99m-VT4BLYj4",
+  authDomain: "elchi-2ffef.firebaseapp.com",
+  projectId: "elchi-2ffef",
+  storageBucket: "elchi-2ffef.firebasestorage.app",
+  messagingSenderId: "796988718541",
+  appId: "1:796988718541:web:402e5e42eaed050b521884",
+  measurementId: "G-5QP3JRT9MT"
+};
+firebase.initializeApp(firebaseConfig);
+
+function checkStrength(pw){
+  const bar = document.getElementById('strength-bar');
+  const lbl = document.getElementById('strength-label');
+  if(!pw){ bar.style.width='0%'; lbl.textContent='Введите пароль'; return; }
+  let score = 0;
+  if(pw.length >= 6) score++;
+  if(pw.length >= 10) score++;
+  if(/[A-Z]/.test(pw)) score++;
+  if(/[0-9]/.test(pw)) score++;
+  if(/[^A-Za-z0-9]/.test(pw)) score++;
+  const levels = [
+    {w:'20%', bg:'#CC0000', t:'Очень слабый'},
+    {w:'40%', bg:'#ED8936', t:'Слабый'},
+    {w:'60%', bg:'#D69E2E', t:'Средний'},
+    {w:'80%', bg:'#3182CE', t:'Хороший'},
+    {w:'100%',bg:'#22A06B', t:'Отличный'},
+  ];
+  const l = levels[score-1] || levels[0];
+  bar.style.width = l.w;
+  bar.style.background = l.bg;
+  lbl.textContent = l.t;
+  lbl.style.color = l.bg;
+}
+
+function showError(msg){
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(()=> el.style.display='none', 4000);
+}
+
+function setStep(n){
+  // Update step indicators
+  for(let i=1;i<=3;i++){
+    const s = document.getElementById('s'+i);
+    s.classList.remove('active','done');
+    if(i < n) s.classList.add('done');
+    if(i === n) s.classList.add('active');
+  }
+  if(document.getElementById('line1'))
+    document.getElementById('line1').classList.toggle('done', n>1);
+  if(document.getElementById('line2'))
+    document.getElementById('line2').classList.toggle('done', n>2);
+
+  // Show panel
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+n).classList.add('active');
+}
+
+function goStep2(){
+  const email = document.getElementById('email').value.trim();
+  const pw    = document.getElementById('password').value;
+  const pw2   = document.getElementById('password2').value;
+
+  if(!email) return showError('Введите email');
+  if(pw.length < 6) return showError('Пароль минимум 6 символов');
+  if(pw !== pw2)    return showError('Пароли не совпадают');
+
+  setStep(2);
+}
+
+function goBack(){
+  setStep(1);
+}
+
+async function doRegister(){
+  const email   = document.getElementById('email').value.trim();
+  const pw      = document.getElementById('password').value;
+  const restName = document.getElementById('rest-name').value.trim();
+
+  if(!restName) return showError('Введите название ресторана');
+
+  const btn = document.getElementById('btn-step2');
+  btn.disabled = true;
+  btn.textContent = 'Регистрируем...';
+
+  try {
+    // Create Firebase Auth user
+    const cred = await firebase.auth().createUserWithEmailAndPassword(email, pw);
+    const idToken = await cred.user.getIdToken();
+
+    // Send to Django
+    const csrf = getCookie('csrftoken');
+    const res = await fetch('/register/', {
+      method: 'POST',
+      headers: {'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken':csrf},
+      body: new URLSearchParams({idToken, restaurantName: restName}),
+    });
+    const data = await res.json();
+
+    if(data.ok){
+      setStep(3);
+      // Animate progress bar → redirect
+      setTimeout(()=>{
+        document.getElementById('progress-bar').style.width = '100%';
+      }, 100);
+      setTimeout(()=>{
+        window.location.href = '/dashboard/';
+      }, 3200);
+    } else {
+      showError(data.error || 'Ошибка регистрации');
+      // Delete the created auth user if django failed
+      await cred.user.delete();
+    }
+  } catch(e){
+    const msgs = {
+      'auth/email-already-in-use': 'Этот email уже зарегистрирован',
+      'auth/invalid-email':        'Неверный формат email',
+      'auth/weak-password':        'Пароль слишком слабый',
+    };
+    showError(msgs[e.code] || e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Зарегистрировать ресторан';
+  }
+}
+
+function getCookie(name){
+  const v = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+
+// Enter key support
+document.addEventListener('keydown', e=>{
+  if(e.key !== 'Enter') return;
+  const panel = document.querySelector('.panel.active').id;
+  if(panel === 'panel-1') goStep2();
+  if(panel === 'panel-2') doRegister();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,397 @@
+{% extends 'base.html' %}
+{% block title %}Заказы{% endblock %}
+{% block page_title %}Заказы{% endblock %}
+
+{% block extra_css %}
+<style>
+.tabs{display:flex;gap:4px;background:#fff;padding:4px;border-radius:10px;margin-bottom:20px;width:fit-content}
+.tab{padding:8px 20px;border-radius:7px;font-family:'Barlow',sans-serif;font-weight:700;font-size:14px;cursor:pointer;border:none;background:transparent;color:#888;transition:all .15s;position:relative}
+.tab.active{background:#8B0000;color:#fff}
+.tab-badge{position:absolute;top:-4px;right:-4px;background:#ED8936;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center}
+
+.orders-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.order-card{background:#fff;border-radius:14px;overflow:hidden;transition:transform .15s}
+.order-card:hover{transform:translateY(-2px)}
+.order-card.is-new{border:1.5px solid rgba(139,0,0,.4)}
+.order-card.is-qr{border:1.5px solid rgba(237,137,54,.5)}
+.order-head{padding:14px;display:flex;align-items:center;gap:12px}
+.order-head.is-new{background:rgba(139,0,0,.05)}
+.order-head.is-qr{background:rgba(237,137,54,.05)}
+.order-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.order-name{font-weight:700;font-size:14px;margin-bottom:2px}
+.order-time{font-size:11px;color:#888}
+.order-body{padding:14px;border-top:1px solid #E5E5E5}
+.order-item{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.item-qty{width:24px;height:24px;background:#F2F2F2;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.order-footer{display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid #E5E5E5;margin-top:4px}
+.order-total{font-family:'Barlow',sans-serif;font-weight:800;font-size:15px;background:#8B0000;color:#fff;padding:4px 12px;border-radius:7px}
+
+/* QR action buttons */
+.qr-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px;border-top:1px solid #E5E5E5}
+.btn-confirm{background:#22A06B;color:#fff;border:none;border-radius:9px;padding:10px;font-family:'Barlow',sans-serif;font-weight:800;font-size:13px;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-confirm:hover{background:#1a8a5a}
+.btn-reject{background:#fff;color:#CC0000;border:1.5px solid #CC0000;border-radius:9px;padding:10px;font-family:'Barlow',sans-serif;font-weight:800;font-size:13px;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-reject:hover{background:#CC0000;color:#fff}
+
+.section-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;margin-top:20px}
+.section-bar{width:4px;height:18px;border-radius:2px}
+.section-title{font-family:'Barlow',sans-serif;font-weight:800;font-size:15px}
+
+.empty-state{text-align:center;padding:60px 20px;color:#888}
+.empty-icon{width:72px;height:72px;background:#F2F2F2;border-radius:18px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+
+/* QR banner */
+.qr-banner{background:linear-gradient(135deg,#ED8936,#DD6B20);border-radius:14px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:14px;color:#fff}
+.qr-banner-icon{font-size:32px;flex-shrink:0}
+.qr-banner-title{font-family:'Barlow',sans-serif;font-weight:900;font-size:18px}
+.qr-banner-sub{font-size:13px;opacity:.85;margin-top:2px}
+
+.client-info{display:flex;align-items:center;gap:6px;padding:8px 14px;background:#FFF8F0;border-top:1px solid #FFE4B5}
+.client-info-text{font-size:12px;color:#888}
+.client-info-val{font-size:12px;font-weight:700;color:#111}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('active',this)">Активные</button>
+  <button class="tab" id="tab-qr" onclick="switchTab('qr',this)">
+    QR заказы
+    <span class="tab-badge" id="qr-badge" style="display:none">0</span>
+  </button>
+  <button class="tab" onclick="switchTab('history',this)">История</button>
+</div>
+
+<div id="orders-container">
+  <div style="text-align:center;padding:40px;color:#888">Загрузка...</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentTab = 'active';
+
+const statusLabels = {
+  pending:'Новый', accepted:'Принят', preparing:'Готовится',
+  ready:'Готов', delivering:'Доставляется', delivered:'Доставлен', cancelled:'Отменён'
+};
+const statusColors = {
+  pending:'#ED8936', accepted:'#3182CE', preparing:'#9F7AEA',
+  ready:'#22A06B', delivering:'#667EEA', delivered:'#22A06B', cancelled:'#CC0000'
+};
+const sections = [
+  {key:'pending',   label:'Новые заказы',    color:'#8B0000'},
+  {key:'ready',     label:'Готово к выдаче', color:'#22A06B'},
+  {key:'preparing', label:'Готовится',       color:'#ED8936'},
+  {key:'accepted',  label:'Принятые',        color:'#3182CE'},
+];
+
+async function loadOrders(){
+  const r = await fetch(`/orders/api/?status=${currentTab === 'qr' ? 'active' : currentTab}`);
+  const d = await r.json();
+  const container = document.getElementById('orders-container');
+  let orders = d.orders || [];
+
+  // Для QR вкладки — только source=qr и status=pending
+  if(currentTab === 'qr'){
+    orders = orders.filter(o => o.source === 'qr' && o.status === 'pending');
+  }
+  // Для активных — исключаем qr pending (они в отдельной вкладке)
+  if(currentTab === 'active'){
+    orders = orders.filter(o => !(o.source === 'qr' && o.status === 'pending'));
+  }
+
+  if(!orders.length){
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="2">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+        </svg>
+      </div>
+      <div style="font-family:Barlow,sans-serif;font-size:18px;font-weight:800;color:#111;margin-bottom:6px">
+        ${currentTab==='qr' ? 'Нет новых QR заказов' : currentTab==='active' ? 'Нет активных заказов' : 'История пуста'}
+      </div>
+      <div style="font-size:13px">Заказы появятся здесь</div>
+    </div>`;
+    return;
+  }
+
+  if(currentTab === 'qr'){
+    // ── QR заказы ─────────────────────────────────────────────────
+    container.innerHTML = `
+      <div class="qr-banner">
+        <div class="qr-banner-icon">📱</div>
+        <div>
+          <div class="qr-banner-title">Заказы от клиентов — ${orders.length} новых</div>
+          <div class="qr-banner-sub">Подтвердите заказы чтобы отправить на кухню</div>
+        </div>
+      </div>
+      <div class="orders-grid">${orders.map(renderQrCard).join('')}</div>`;
+  } else if(currentTab === 'active'){
+    let html = '';
+    sections.forEach(sec=>{
+      const group = orders.filter(o=>o.status===sec.key);
+      if(!group.length) return;
+      html += `<div class="section-header">
+        <div class="section-bar" style="background:${sec.color}"></div>
+        <span class="section-title">${sec.label}</span>
+        <span style="background:${sec.color};color:#fff;border-radius:20px;padding:2px 8px;font-size:11px;font-weight:800">${group.length}</span>
+      </div>
+      <div class="orders-grid">${group.map(renderCard).join('')}</div>`;
+    });
+    container.innerHTML = html || '<div style="text-align:center;padding:40px;color:#888">Нет активных заказов</div>';
+  } else {
+    container.innerHTML = `<div class="orders-grid">${orders.map(renderCard).join('')}</div>`;
+  }
+}
+
+// ── Обычная карточка заказа ────────────────────────────────────────
+function renderCard(o){
+  const isNew  = o.status === 'pending';
+  const isReady = o.status === 'ready';
+  const color  = statusColors[o.status] || '#888';
+  const items  = (o.items||[]).slice(0,3).map(it=>`
+    <div class="order-item">
+      <div class="item-qty">${it.quantity}</div>
+      <span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.dishName}</span>
+      <span style="font-size:13px;font-weight:600">${(it.total||0).toFixed(0)} сум</span>
+    </div>`).join('');
+  const more = (o.items||[]).length > 3
+    ? `<div style="font-size:12px;color:#888">+ ещё ${o.items.length-3} позиции</div>` : '';
+
+  return `<div class="order-card ${isNew?'is-new':''}" id="card-${o.id}">
+    <div class="order-head ${isNew?'is-new':''}">
+      <div class="order-icon" style="background:${color}20">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/>
+        </svg>
+      </div>
+      <div style="flex:1">
+        <div class="order-name">Стол ${o.tableNumber||'—'}
+          ${isNew?'<span style="background:#8B0000;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;font-weight:800;margin-left:6px;font-family:Barlow,sans-serif">НОВЫЙ</span>':''}
+          ${o.source==='qr'?'<span style="background:#ED8936;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;font-weight:800;margin-left:4px;font-family:Barlow,sans-serif">QR</span>':''}
+        </div>
+        <div class="order-time">${o.createdAt||''} ${o.waiterName ? '• '+o.waiterName : ''}</div>
+      </div>
+      <span style="background:${color}20;color:${color};border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700">${statusLabels[o.status]||o.status}</span>
+    </div>
+    <div class="order-body">
+      ${items}${more}
+      <div class="order-footer">
+        <span style="font-size:13px;color:#888">${o.items?.length||0} поз.</span>
+        <span class="order-total">${(o.totalPrice||0).toFixed(0)} сум</span>
+      </div>
+    </div>
+
+    <!-- ✅ Кнопки действий -->
+    <div style="display:grid;grid-template-columns:${isReady?'1fr 1fr':'1fr'};gap:8px;padding:10px 14px;border-top:1px solid #E5E5E5">
+      <button onclick="closeBill('${o.id}','${o.tableId||''}')"
+        style="background:#fff;color:#8B0000;border:1.5px solid #8B0000;border-radius:9px;padding:9px;
+          font-family:'Barlow',sans-serif;font-weight:800;font-size:13px;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        Закрыть счёт
+      </button>
+      ${isReady ? `
+      <button onclick="markDelivered('${o.id}')"
+        style="background:#22A06B;color:#fff;border:none;border-radius:9px;padding:9px;
+          font-family:'Barlow',sans-serif;font-weight:800;font-size:13px;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;gap:6px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Выдан
+      </button>` : ''}
+    </div>
+  </div>`;
+}
+
+async function closeBill(orderId, tableId){
+  if(!confirm('Закрыть счёт и освободить стол?')) return;
+  const card = document.getElementById('card-' + orderId);
+  if(card) card.style.opacity = '0.5';
+  try {
+    await fetch(`/orders/${orderId}/status/`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
+      body: JSON.stringify({status: 'delivered'}),
+    });
+    showToast('✅ Счёт закрыт!', '#22A06B');
+    loadOrders();
+  } catch(e) {
+    if(card) card.style.opacity = '1';
+    showToast('Ошибка. Попробуйте снова.', '#CC0000');
+  }
+}
+
+async function markDelivered(orderId){
+  const card = document.getElementById('card-' + orderId);
+  if(card) card.style.opacity = '0.5';
+  try {
+    await fetch(`/orders/${orderId}/status/`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
+      body: JSON.stringify({status: 'delivered'}),
+    });
+    showToast('✅ Заказ выдан!', '#22A06B');
+    loadOrders();
+  } catch(e) {
+    if(card) card.style.opacity = '1';
+    showToast('Ошибка.', '#CC0000');
+  }
+}
+
+// ── QR карточка с кнопками подтвердить/отклонить ──────────────────
+function renderQrCard(o){
+  const items = (o.items||[]).map(it=>`
+    <div class="order-item">
+      <div class="item-qty">${it.quantity}</div>
+      <span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.dishName}</span>
+      <span style="font-size:13px;font-weight:600">${(it.total||0).toFixed(0)} сум</span>
+    </div>`).join('');
+
+  const clientName  = o.clientName  || '';
+  const clientPhone = o.clientPhone || '';
+
+  return `<div class="order-card is-qr" id="qr-card-${o.id}">
+    <div class="order-head is-qr">
+      <div class="order-icon" style="background:#ED893620">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ED8936" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3zM14 20h3"/>
+        </svg>
+      </div>
+      <div style="flex:1">
+        <div class="order-name">
+          Стол ${o.tableNumber||'—'}
+          <span style="background:#ED8936;color:#fff;border-radius:20px;padding:1px 7px;font-size:9px;font-weight:800;margin-left:6px;font-family:Barlow,sans-serif">QR</span>
+        </div>
+        <div class="order-time">${o.createdAt||''}</div>
+      </div>
+      <span style="background:#ED893620;color:#ED8936;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700">Ожидает</span>
+    </div>
+
+    ${(clientName || clientPhone) ? `
+    <div class="client-info">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      ${clientName ? `<span class="client-info-val">${clientName}</span>` : ''}
+      ${clientPhone ? `<span class="client-info-text">${clientPhone}</span>` : ''}
+    </div>` : ''}
+
+    <div class="order-body">
+      ${items}
+      ${o.comment ? `<div style="margin-top:8px;padding:8px;background:#FFF8F0;border-radius:8px;font-size:12px;color:#888">
+        💬 ${o.comment}</div>` : ''}
+      <div class="order-footer">
+        <span style="font-size:12px;color:#888">${o.items?.length||0} позиций</span>
+        <span class="order-total">${(o.totalPrice||0).toFixed(0)} сум</span>
+      </div>
+    </div>
+
+    <div class="qr-actions">
+      <button class="btn-confirm" onclick="confirmQrOrder('${o.id}','${o.tableId||''}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Подтвердить
+      </button>
+      <button class="btn-reject" onclick="rejectQrOrder('${o.id}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+        Отклонить
+      </button>
+    </div>
+  </div>`;
+}
+
+// ── Подтвердить QR заказ → статус accepted ─────────────────────────
+async function confirmQrOrder(orderId, tableId){
+  const card = document.getElementById('qr-card-' + orderId);
+  if(card) card.style.opacity = '0.5';
+  try {
+    await fetch(`/orders/${orderId}/status/`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
+      body: JSON.stringify({status: 'accepted'}),
+    });
+    showToast('✅ Заказ подтверждён и отправлен на кухню!', '#22A06B');
+    loadOrders();
+    loadQrBadge();
+  } catch(e) {
+    if(card) card.style.opacity = '1';
+    showToast('Ошибка. Попробуйте снова.', '#CC0000');
+  }
+}
+
+// ── Отклонить QR заказ → статус cancelled ─────────────────────────
+async function rejectQrOrder(orderId){
+  if(!confirm('Отклонить этот заказ?')) return;
+  const card = document.getElementById('qr-card-' + orderId);
+  if(card) card.style.opacity = '0.5';
+  try {
+    await fetch(`/orders/${orderId}/status/`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
+      body: JSON.stringify({status: 'cancelled'}),
+    });
+    showToast('❌ Заказ отклонён', '#CC0000');
+    loadOrders();
+    loadQrBadge();
+  } catch(e) {
+    if(card) card.style.opacity = '1';
+    showToast('Ошибка. Попробуйте снова.', '#CC0000');
+  }
+}
+
+// ── Бейдж на вкладке QR заказы ────────────────────────────────────
+async function loadQrBadge(){
+  try {
+    const r = await fetch('/orders/api/?status=active');
+    const d = await r.json();
+    const count = (d.orders||[]).filter(o => o.source==='qr' && o.status==='pending').length;
+    const badge = document.getElementById('qr-badge');
+    if(count > 0){
+      badge.textContent = count;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch(e){}
+}
+
+function switchTab(tab, el){
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  loadOrders();
+}
+
+function getCookie(name){
+  const v = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+
+function showToast(msg, bg='#111'){
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${bg};color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:9999;white-space:nowrap;animation:fadeIn .3s ease`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 3000);
+}
+
+loadOrders();
+loadQrBadge();
+setInterval(()=>{
+  if(currentTab==='active') loadOrders();
+  loadQrBadge();
+}, 15000);
+</script>
+{% endblock %}

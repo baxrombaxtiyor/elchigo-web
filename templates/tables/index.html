@@ -1,0 +1,424 @@
+{% extends 'base.html' %}
+{% block title %}Столики{% endblock %}
+{% block page_title %}Столики / QR-меню{% endblock %}
+
+{% block extra_css %}
+<style>
+.tables-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.cat-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.cat-tab{padding:8px 18px;border-radius:20px;border:1.5px solid var(--grey2);cursor:pointer;
+  font-size:13px;font-weight:600;color:var(--muted);background:#fff;transition:all .15s;
+  display:flex;align-items:center;gap:6px}
+.cat-tab:hover{border-color:var(--dark-red);color:var(--dark-red)}
+.cat-tab.active{background:var(--dark-red);color:#fff;border-color:var(--dark-red)}
+.cat-tab .cat-count{background:rgba(255,255,255,0.3);border-radius:10px;padding:1px 7px;font-size:11px}
+.cat-tab:not(.active) .cat-count{background:var(--grey2);color:var(--muted)}
+.cat-manage-btn{padding:7px 14px;border-radius:8px;border:1.5px solid var(--grey2);
+  cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);background:#fff;transition:all .15s}
+.cat-manage-btn:hover{border-color:var(--dark-red);color:var(--dark-red)}
+
+.table-card{background:#fff;border-radius:14px;padding:20px;text-align:center;
+  border:1.5px solid var(--grey2);transition:all .15s}
+.table-card:hover{border-color:#ccc;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.cat-badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;
+  font-weight:700;margin-bottom:8px;background:var(--grey);color:var(--muted)}
+
+.cat-list-item{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;background:var(--grey);border-radius:8px;margin-bottom:8px}
+.cat-list-item-name{font-weight:700;font-size:14px}
+.cat-list-item-count{font-size:12px;color:var(--muted)}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="tables-header">
+  <div style="display:flex;gap:8px">
+    <button class="cat-manage-btn" onclick="openCatsModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px">
+        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+      </svg>
+      Категории
+    </button>
+  </div>
+  <button class="btn btn-primary" onclick="openModal()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Добавить столик
+  </button>
+</div>
+
+<!-- Category tabs -->
+<div class="cat-tabs" id="cat-tabs">
+  <div class="cat-tab active" onclick="filterByCategory('all', this)" data-cat="all">
+    Все
+    <span class="cat-count" id="count-all">{{ tables|length }}</span>
+  </div>
+</div>
+
+<!-- Tables grid -->
+{% if not tables %}
+<div style="text-align:center;padding:60px;color:#888">
+  <div style="font-family:Barlow,sans-serif;font-size:20px;font-weight:800;color:#111;margin-bottom:8px">Столиков нет</div>
+  <div>Добавьте первый столик</div>
+</div>
+{% else %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px" id="tables-grid">
+  {% for t in tables %}
+  <div class="table-card" data-cat="{{ t.category|default:'' }}">
+    {% if t.category %}
+      <div class="cat-badge">{{ t.category }}</div>
+    {% endif %}
+    <div style="width:56px;height:56px;background:#F2F2F2;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2">
+        <rect x="3" y="8" width="18" height="3" rx="1"/><path d="M6 11v6M18 11v6"/>
+      </svg>
+    </div>
+    <div style="font-family:Barlow,sans-serif;font-size:20px;font-weight:900">Стол {{ t.number }}</div>
+    <div style="font-size:12px;color:#888;margin-bottom:4px">{{ t.seats }} мест</div>
+    {% if t.waiterName %}
+      <div style="font-size:12px;color:#8B0000;font-weight:700;margin-bottom:12px">👤 {{ t.waiterName }}</div>
+    {% else %}
+      <div style="font-size:12px;color:#ccc;margin-bottom:12px">Официант не назначен</div>
+    {% endif %}
+    <div style="display:flex;gap:8px">
+      <a href="/tables/{{ t.id }}/qr/" class="btn btn-outline btn-sm" style="flex:1;justify-content:center;text-decoration:none">QR</a>
+      <button class="btn btn-outline btn-sm" onclick="openAssignModal('{{ t.id }}','{{ t.number }}')" title="Официант" style="padding:0 10px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="openChangeCatModal('{{ t.id }}','{{ t.number }}','{{ t.category|default:'' }}')" title="Категория" style="padding:0 10px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+        </svg>
+      </button>
+      <button class="btn btn-danger btn-sm" onclick="deleteTable('{{ t.id }}')" style="padding:0 10px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H8L5 6"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+
+<!-- ── Modal: Добавить столик ── -->
+<div class="modal-bg" id="table-modal">
+  <div class="modal">
+    <div class="modal-title">Новый столик</div>
+    <div class="form-group">
+      <label class="form-label">Номер столика</label>
+      <input class="form-input" id="t-number" placeholder="1">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Количество мест</label>
+      <input class="form-input" id="t-seats" type="number" value="4">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Категория</label>
+      <select class="form-input" id="t-category">
+        <option value="">— Без категории —</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Официант</label>
+      <select class="form-input" id="t-waiter">
+        <option value="">— Не назначен —</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="addTable()">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Назначить официанта ── -->
+<div class="modal-bg" id="assign-modal">
+  <div class="modal">
+    <div class="modal-title">Назначить официанта</div>
+    <div style="color:#888;font-size:14px;margin-bottom:16px" id="assign-table-label">Стол</div>
+    <div class="form-group">
+      <label class="form-label">Официант</label>
+      <select class="form-input" id="assign-waiter">
+        <option value="">— Не назначен —</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeAssignModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="assignWaiter()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Изменить категорию стола ── -->
+<div class="modal-bg" id="change-cat-modal">
+  <div class="modal">
+    <div class="modal-title">Категория стола</div>
+    <div style="color:#888;font-size:14px;margin-bottom:16px" id="change-cat-label">Стол</div>
+    <div class="form-group">
+      <label class="form-label">Категория</label>
+      <select class="form-input" id="change-cat-select">
+        <option value="">— Без категории —</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="document.getElementById('change-cat-modal').classList.remove('open')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveTableCategory()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Управление категориями ── -->
+<div class="modal-bg" id="cats-modal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title">Категории столов</div>
+    <div id="cats-list" style="margin-bottom:16px"></div>
+    <div style="display:flex;gap:8px">
+      <input class="form-input" id="new-cat-input" placeholder="Название категории (Зал, VIP, Терраса...)" style="flex:1">
+      <button class="btn btn-primary" onclick="addCategory()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Добавить
+      </button>
+    </div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn btn-outline" onclick="closeCatsModal()" style="flex:none;width:100%;justify-content:center">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const RESTAURANT_ID = '{{ restaurant_id }}';
+let staffList    = [];
+let categories   = [];
+let assignTableId = '';
+let changeCatTableId = '';
+
+// ── Загрузка категорий ───────────────────────────────────────────
+async function loadCategories() {
+  try {
+    const r = await fetch('/tables/categories/');
+    const d = await r.json();
+    categories = d.categories || [];
+    renderCatTabs();
+    renderCatSelects();
+    renderCatsList();
+  } catch(e) { console.error(e); }
+}
+
+function renderCatTabs() {
+  const tabs   = document.getElementById('cat-tabs');
+  const tables = document.querySelectorAll('.table-card');
+  const counts = {};
+  tables.forEach(t => {
+    const c = t.dataset.cat || '';
+    counts[c] = (counts[c] || 0) + 1;
+  });
+
+  let html = `<div class="cat-tab active" onclick="filterByCategory('all',this)" data-cat="all">
+    Все <span class="cat-count">${tables.length}</span>
+  </div>`;
+
+  // Без категории
+  const uncatCount = counts[''] || 0;
+  if (uncatCount > 0) {
+    html += `<div class="cat-tab" onclick="filterByCategory('__none__',this)" data-cat="__none__">
+      Без категории <span class="cat-count">${uncatCount}</span>
+    </div>`;
+  }
+
+  categories.forEach(cat => {
+    const cnt = counts[cat] || 0;
+    html += `<div class="cat-tab" onclick="filterByCategory('${cat}',this)" data-cat="${cat}">
+      ${cat} <span class="cat-count">${cnt}</span>
+    </div>`;
+  });
+
+  tabs.innerHTML = html;
+}
+
+function renderCatSelects() {
+  const opts = '<option value="">— Без категории —</option>' +
+    categories.map(c => `<option value="${c}">${c}</option>`).join('');
+  ['t-category', 'change-cat-select'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts;
+  });
+}
+
+function renderCatsList() {
+  const list = document.getElementById('cats-list');
+  if (!list) return;
+  if (!categories.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">Нет категорий. Добавьте первую!</div>';
+    return;
+  }
+  list.innerHTML = categories.map((cat, i) => `
+    <div class="cat-list-item">
+      <div>
+        <div class="cat-list-item-name">${cat}</div>
+      </div>
+      <button onclick="deleteCategory(${i})" class="btn btn-danger btn-sm">Удалить</button>
+    </div>`).join('');
+}
+
+// ── Фильтр по категории ──────────────────────────────────────────
+function filterByCategory(cat, el) {
+  document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.table-card').forEach(card => {
+    if (cat === 'all') {
+      card.style.display = '';
+    } else if (cat === '__none__') {
+      card.style.display = !card.dataset.cat ? '' : 'none';
+    } else {
+      card.style.display = card.dataset.cat === cat ? '' : 'none';
+    }
+  });
+}
+
+// ── Управление категориями ───────────────────────────────────────
+function openCatsModal() {
+  renderCatsList();
+  document.getElementById('cats-modal').classList.add('open');
+}
+function closeCatsModal() {
+  document.getElementById('cats-modal').classList.remove('open');
+  loadCategories();
+}
+
+async function addCategory() {
+  const input = document.getElementById('new-cat-input');
+  const name  = input.value.trim();
+  if (!name) return;
+  await fetch('/tables/categories/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify({name}),
+  });
+  input.value = '';
+  const r = await fetch('/tables/categories/');
+  const d = await r.json();
+  categories = d.categories || [];
+  renderCatsList();
+  renderCatSelects();
+}
+
+async function deleteCategory(index) {
+  if (!confirm('Удалить категорию? Столы останутся, но потеряют категорию.')) return;
+  const name = categories[index];
+  await fetch('/tables/categories/delete/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify({name}),
+  });
+  const r = await fetch('/tables/categories/');
+  const d = await r.json();
+  categories = d.categories || [];
+  renderCatsList();
+  renderCatSelects();
+}
+
+// ── Изменить категорию стола ─────────────────────────────────────
+function openChangeCatModal(tableId, tableNumber, currentCat) {
+  changeCatTableId = tableId;
+  document.getElementById('change-cat-label').textContent = 'Стол ' + tableNumber;
+  renderCatSelects();
+  document.getElementById('change-cat-select').value = currentCat || '';
+  document.getElementById('change-cat-modal').classList.add('open');
+}
+
+async function saveTableCategory() {
+  const cat = document.getElementById('change-cat-select').value;
+  await fetch(`/tables/${changeCatTableId}/category/`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify({category: cat}),
+  });
+  location.reload();
+}
+
+// ── Добавить столик ──────────────────────────────────────────────
+function openModal() { loadStaff(); renderCatSelects(); document.getElementById('table-modal').classList.add('open'); }
+function closeModal() { document.getElementById('table-modal').classList.remove('open'); }
+
+async function addTable() {
+  const number   = document.getElementById('t-number').value.trim();
+  const seats    = document.getElementById('t-seats').value;
+  const waiterId = document.getElementById('t-waiter').value;
+  const category = document.getElementById('t-category').value;
+  if (!number) return alert('Введите номер столика');
+  const waiter     = staffList.find(s => s.uid === waiterId);
+  const waiterName = waiter ? (waiter.name || waiter.email) : '';
+  await fetch('/tables/add/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify({number, seats, waiterId, waiterName, category}),
+  });
+  location.reload();
+}
+
+// ── Официант ─────────────────────────────────────────────────────
+async function loadStaff() {
+  try {
+    const res  = await fetch('/staff/api/');
+    const data = await res.json();
+    staffList  = (data.staff || []).filter(s => s.role === 'waiter');
+    const options = staffList.map(s => `<option value="${s.uid}">${s.name || s.email}</option>`).join('');
+    document.getElementById('t-waiter').innerHTML        = '<option value="">— Не назначен —</option>' + options;
+    document.getElementById('assign-waiter').innerHTML   = '<option value="">— Не назначен —</option>' + options;
+  } catch(e) {}
+}
+
+function openAssignModal(tableId, tableNumber) {
+  assignTableId = tableId;
+  document.getElementById('assign-table-label').textContent = 'Стол ' + tableNumber;
+  loadStaff();
+  document.getElementById('assign-modal').classList.add('open');
+}
+function closeAssignModal() { document.getElementById('assign-modal').classList.remove('open'); }
+
+async function assignWaiter() {
+  const waiterId   = document.getElementById('assign-waiter').value;
+  const waiter     = staffList.find(s => s.uid === waiterId);
+  const waiterName = waiter ? (waiter.name || waiter.email) : '';
+  await fetch(`/tables/${assignTableId}/assign/`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify({waiterId, waiterName}),
+  });
+  location.reload();
+}
+
+// ── Удалить ──────────────────────────────────────────────────────
+async function deleteTable(id) {
+  if (!confirm('Удалить столик?')) return;
+  await fetch(`/tables/${id}/delete/`, {
+    method: 'DELETE', headers: {'X-CSRFToken':getCookie('csrftoken')}
+  });
+  location.reload();
+}
+
+function getCookie(n) {
+  const v = document.cookie.match('(^|;)\\s*' + n + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+
+document.querySelectorAll('.modal-bg').forEach(bg =>
+  bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); })
+);
+
+// Init
+loadCategories();
+</script>
+{% endblock %}

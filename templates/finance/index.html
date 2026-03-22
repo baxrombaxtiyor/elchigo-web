@@ -1,0 +1,560 @@
+{% extends 'base.html' %}
+{% block title %}Финансы{% endblock %}
+{% block page_title %}Финансы{% endblock %}
+
+{% block extra_css %}
+<style>
+.finance-layout{display:grid;grid-template-columns:220px 1fr;gap:20px;align-items:start}
+
+/* Sidebar */
+.finance-nav{background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--grey2);position:sticky;top:20px}
+.finance-nav-title{padding:14px 16px;font-family:'Barlow',sans-serif;font-size:11px;font-weight:800;color:var(--muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--grey2)}
+.finance-nav-item{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;font-size:14px;font-weight:600;color:var(--muted);transition:all .15s;border-left:3px solid transparent}
+.finance-nav-item:hover{background:var(--grey);color:var(--black)}
+.finance-nav-item.active{background:#CC000008;color:var(--dark-red);border-left-color:var(--dark-red)}
+.finance-nav-item svg{width:16px;height:16px;flex-shrink:0}
+
+/* Sections */
+.finance-section{display:none}
+.finance-section.active{display:block}
+.section-title{font-family:'Barlow',sans-serif;font-size:20px;font-weight:900;margin-bottom:4px}
+.section-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
+
+/* Balance cards */
+.balance-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+.balance-card{background:#fff;border-radius:14px;padding:18px 20px;border:1px solid var(--grey2)}
+.balance-card.income{border-top:3px solid #22A06B}
+.balance-card.expense{border-top:3px solid #CC0000}
+.balance-card.profit{border-top:3px solid #3182CE}
+.bc-label{font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600}
+.bc-value{font-family:'Barlow',sans-serif;font-size:24px;font-weight:900}
+.bc-value.green{color:#22A06B}
+.bc-value.red{color:#CC0000}
+.bc-value.blue{color:#3182CE}
+.bc-sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* Period selector */
+.period-tabs{display:flex;gap:6px;margin-bottom:20px}
+.period-tab{padding:7px 16px;border-radius:8px;border:1.5px solid var(--grey2);cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);background:#fff;transition:all .15s}
+.period-tab:hover{border-color:var(--dark-red);color:var(--dark-red)}
+.period-tab.active{background:var(--dark-red);color:#fff;border-color:var(--dark-red)}
+
+/* Chart */
+.chart-wrap{background:#fff;border-radius:14px;border:1px solid var(--grey2);padding:20px;margin-bottom:20px}
+.chart-title{font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;margin-bottom:16px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:140px;padding-bottom:4px}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar-income{background:#22A06B20;border-radius:4px 4px 0 0;width:100%;min-height:4px;position:relative;cursor:pointer;transition:.2s}
+.bar-income:hover{background:#22A06B40}
+.bar-expense{background:#CC000020;border-radius:4px 4px 0 0;width:100%;min-height:4px;position:relative;cursor:pointer;transition:.2s}
+.bar-expense:hover{background:#CC000040}
+.bar-label{font-size:10px;color:var(--muted);text-align:center}
+.chart-legend{display:flex;gap:16px;margin-top:10px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+
+/* Transactions table */
+.tx-filters{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.tx-filter-select{padding:8px 12px;border:1.5px solid var(--grey2);border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;background:#fff;outline:none;cursor:pointer}
+.tx-filter-select:focus{border-color:var(--dark-red)}
+.tx-amount{font-family:'Barlow',sans-serif;font-weight:800}
+.tx-amount.income{color:#22A06B}
+.tx-amount.expense{color:#CC0000}
+.tx-type-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.tx-type-payment{background:#22A06B15;color:#22A06B}
+.tx-type-expense{background:#CC000015;color:#CC0000}
+
+/* Expense form */
+.expense-form{background:#fff;border-radius:14px;border:1px solid var(--grey2);padding:20px;margin-bottom:20px}
+.expense-form-title{font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;margin-bottom:16px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+/* Categories */
+.cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cat-card{background:#fff;border-radius:12px;border:1px solid var(--grey2);padding:16px}
+.cat-card-title{font-family:'Barlow',sans-serif;font-weight:800;font-size:14px;margin-bottom:12px}
+.cat-list{display:flex;flex-direction:column;gap:6px}
+.cat-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--grey);border-radius:8px;font-size:13px}
+.cat-item-name{font-weight:600}
+.cat-delete{background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:0 4px}
+.cat-delete:hover{color:#CC0000}
+.cat-add-row{display:flex;gap:8px;margin-top:10px}
+.cat-add-input{flex:1;padding:8px 10px;border:1.5px solid var(--grey2);border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none}
+.cat-add-input:focus{border-color:var(--dark-red)}
+
+/* Empty state */
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-state svg{width:48px;height:48px;opacity:.3;margin-bottom:12px}
+.empty-state p{font-size:14px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="finance-layout">
+
+  <!-- Sidebar -->
+  <div class="finance-nav">
+    <div class="finance-nav-title">Финансы</div>
+    <div class="finance-nav-item active" onclick="showTab('operations',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
+      </svg>
+      Денежные операции
+    </div>
+    <div class="finance-nav-item" onclick="showTab('expenses',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      Добавить расход
+    </div>
+    <div class="finance-nav-item" onclick="showTab('categories',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+      </svg>
+      Категории
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div>
+
+    <!-- ── ДЕНЕЖНЫЕ ОПЕРАЦИИ ── -->
+    <div class="finance-section active" id="tab-operations">
+      <div class="section-title">Денежные операции</div>
+      <div class="section-sub">Доходы, расходы и баланс ресторана</div>
+
+      <!-- Period -->
+      <div class="period-tabs">
+        <button class="period-tab active" onclick="loadOperations('today',this)">Сегодня</button>
+        <button class="period-tab" onclick="loadOperations('week',this)">Неделя</button>
+        <button class="period-tab" onclick="loadOperations('month',this)">Месяц</button>
+        <button class="period-tab" onclick="loadOperations('all',this)">Всё время</button>
+      </div>
+
+      <!-- Balance cards -->
+      <div class="balance-grid" id="balance-cards">
+        <div class="balance-card income">
+          <div class="bc-label">💰 Доходы</div>
+          <div class="bc-value green" id="total-income">—</div>
+          <div class="bc-sub" id="income-count">— операций</div>
+        </div>
+        <div class="balance-card expense">
+          <div class="bc-label">📤 Расходы</div>
+          <div class="bc-value red" id="total-expense">—</div>
+          <div class="bc-sub" id="expense-count">— операций</div>
+        </div>
+        <div class="balance-card profit">
+          <div class="bc-label">📊 Баланс</div>
+          <div class="bc-value blue" id="total-profit">—</div>
+          <div class="bc-sub">Доходы − Расходы</div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="chart-wrap">
+        <div class="chart-title">График по дням</div>
+        <div class="bars" id="chart-bars">
+          <div style="margin:auto;color:var(--muted);font-size:13px">Загрузка...</div>
+        </div>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#22A06B"></div>Доходы</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#CC0000"></div>Расходы</div>
+        </div>
+      </div>
+
+      <!-- Transactions -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">История операций</span>
+          <div class="tx-filters">
+            <select class="tx-filter-select" id="filter-type" onchange="filterTransactions()">
+              <option value="all">Все типы</option>
+              <option value="payment">Доходы</option>
+              <option value="expense">Расходы</option>
+            </select>
+            <select class="tx-filter-select" id="filter-method" onchange="filterTransactions()">
+              <option value="all">Все методы</option>
+              <option value="Terminal">Terminal</option>
+              <option value="Humo">Humo</option>
+              <option value="Click">Click</option>
+              <option value="Payme">Payme</option>
+              <option value="UZCARD">UZCARD</option>
+              <option value="Naqd">Naqd</option>
+            </select>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr>
+              <th>Дата</th><th>Тип</th><th>Описание</th>
+              <th>Категория</th><th>Метод</th><th style="text-align:right">Сумма</th>
+            </tr></thead>
+            <tbody id="transactions-tbody">
+              <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ДОБАВИТЬ РАСХОД ── -->
+    <div class="finance-section" id="tab-expenses">
+      <div class="section-title">Добавить расход</div>
+      <div class="section-sub">Зафиксируйте расход ресторана вручную</div>
+
+      <div class="expense-form">
+        <div class="expense-form-title">Новый расход</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Описание *</label>
+            <input class="form-input" id="exp-desc" placeholder="Например: Закупка продуктов">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Сумма (сум) *</label>
+            <input class="form-input" id="exp-amount" type="number" placeholder="0">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Категория</label>
+            <select class="form-input" id="exp-category">
+              <option value="">Без категории</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Дата</label>
+            <input class="form-input" id="exp-date" type="date">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Комментарий</label>
+          <input class="form-input" id="exp-comment" placeholder="Необязательно">
+        </div>
+        <button class="btn btn-primary" onclick="saveExpense()" style="width:100%;justify-content:center;padding:13px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Добавить расход
+        </button>
+      </div>
+
+      <!-- Recent expenses -->
+      <div class="card">
+        <div class="card-header"><span class="card-title">Последние расходы</span></div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr>
+              <th>Дата</th><th>Описание</th><th>Категория</th>
+              <th style="text-align:right">Сумма</th><th></th>
+            </tr></thead>
+            <tbody id="expenses-tbody">
+              <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:30px">Загрузка...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── КАТЕГОРИИ ── -->
+    <div class="finance-section" id="tab-categories">
+      <div class="section-title">Категории</div>
+      <div class="section-sub">Управляйте категориями доходов и расходов</div>
+
+      <div class="cat-grid">
+        <!-- Категории расходов -->
+        <div class="cat-card">
+          <div class="cat-card-title">📤 Категории расходов</div>
+          <div class="cat-list" id="expense-cats-list"></div>
+          <div class="cat-add-row">
+            <input class="cat-add-input" id="new-expense-cat" placeholder="Новая категория...">
+            <button class="btn btn-primary btn-sm" onclick="addCategory('expense')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Добавить
+            </button>
+          </div>
+        </div>
+
+        <!-- Категории доходов -->
+        <div class="cat-card">
+          <div class="cat-card-title">💰 Категории доходов</div>
+          <div class="cat-list" id="income-cats-list"></div>
+          <div class="cat-add-row">
+            <input class="cat-add-input" id="new-income-cat" placeholder="Новая категория...">
+            <button class="btn btn-primary btn-sm" onclick="addCategory('income')">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Добавить
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allTransactions = [];
+let currentPeriod   = 'today';
+
+// ── Navigation ──────────────────────────────────────────────────────────────
+function showTab(name, el) {
+  document.querySelectorAll('.finance-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.finance-nav-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'categories') loadCategories();
+  if (name === 'expenses')   { loadExpenses(); loadExpenseCats(); }
+}
+
+// ── Format ──────────────────────────────────────────────────────────────────
+function fmt(n) {
+  return new Intl.NumberFormat('ru-RU').format(Math.round(n)) + ' сум';
+}
+
+// ── Load Operations ──────────────────────────────────────────────────────────
+async function loadOperations(period, btn) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  try {
+    const r = await fetch('/finance/api/?period=' + period);
+    const d = await r.json();
+    allTransactions = d.transactions || [];
+
+    // Balance cards
+    document.getElementById('total-income').textContent  = fmt(d.total_income  || 0);
+    document.getElementById('total-expense').textContent = fmt(d.total_expense || 0);
+    const profit = (d.total_income || 0) - (d.total_expense || 0);
+    const profEl = document.getElementById('total-profit');
+    profEl.textContent = fmt(Math.abs(profit));
+    profEl.className   = 'bc-value ' + (profit >= 0 ? 'blue' : 'red');
+    document.getElementById('income-count').textContent  = (d.income_count  || 0) + ' операций';
+    document.getElementById('expense-count').textContent = (d.expense_count || 0) + ' операций';
+
+    // Chart
+    renderChart(d.daily || {});
+
+    // Table
+    filterTransactions();
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+// ── Chart ────────────────────────────────────────────────────────────────────
+function renderChart(daily) {
+  const wrap = document.getElementById('chart-bars');
+  const days = Object.keys(daily).sort();
+  if (!days.length) {
+    wrap.innerHTML = '<div style="margin:auto;color:var(--muted);font-size:13px">Нет данных</div>';
+    return;
+  }
+  const maxIncome  = Math.max(...days.map(d => daily[d].income  || 0), 1);
+  const maxExpense = Math.max(...days.map(d => daily[d].expense || 0), 1);
+  const maxVal     = Math.max(maxIncome, maxExpense);
+  const H          = 120;
+
+  wrap.innerHTML = days.map(day => {
+    const inc = daily[day].income  || 0;
+    const exp = daily[day].expense || 0;
+    const hi  = Math.max(4, Math.round(inc / maxVal * H));
+    const he  = Math.max(0, Math.round(exp / maxVal * H));
+    return `<div class="bar-col">
+      <div style="display:flex;gap:2px;align-items:flex-end;height:${H}px">
+        <div class="bar-income"  style="height:${hi}px" title="${fmt(inc)}"></div>
+        <div class="bar-expense" style="height:${he}px" title="${fmt(exp)}"></div>
+      </div>
+      <div class="bar-label">${day}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Filter Transactions ──────────────────────────────────────────────────────
+function filterTransactions() {
+  const type   = document.getElementById('filter-type').value;
+  const method = document.getElementById('filter-method').value;
+  let filtered = allTransactions;
+  if (type   !== 'all') filtered = filtered.filter(t => t.type   === type);
+  if (method !== 'all') filtered = filtered.filter(t => t.method === method);
+
+  const tbody = document.getElementById('transactions-tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:30px">Нет операций</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(t => {
+    const isIncome  = t.type === 'payment';
+    const amtClass  = isIncome ? 'income' : 'expense';
+    const amtPrefix = isIncome ? '+' : '−';
+    const badge     = isIncome
+      ? '<span class="tx-type-badge tx-type-payment">Доход</span>'
+      : '<span class="tx-type-badge tx-type-expense">Расход</span>';
+    return `<tr>
+      <td style="color:var(--muted);font-size:12px">${t.date || '—'}</td>
+      <td>${badge}</td>
+      <td style="font-weight:600">${t.description || '—'}</td>
+      <td style="color:var(--muted)">${t.category || '—'}</td>
+      <td><span style="background:var(--grey);border-radius:6px;padding:2px 8px;font-size:12px">${t.method || '—'}</span></td>
+      <td style="text-align:right"><span class="tx-amount ${amtClass}">${amtPrefix}${fmt(t.amount)}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Expenses ─────────────────────────────────────────────────────────────────
+async function loadExpenses() {
+  try {
+    const r = await fetch('/finance/expenses/');
+    const d = await r.json();
+    const tbody = document.getElementById('expenses-tbody');
+    if (!d.expenses || !d.expenses.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:30px">Нет расходов</td></tr>';
+      return;
+    }
+    tbody.innerHTML = d.expenses.map(e => `<tr>
+      <td style="color:var(--muted);font-size:12px">${e.date || '—'}</td>
+      <td style="font-weight:600">${e.description}</td>
+      <td style="color:var(--muted)">${e.category || '—'}</td>
+      <td style="text-align:right"><span class="tx-amount expense">−${fmt(e.amount)}</span></td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteExpense('${e.id}')">Удалить</button></td>
+    </tr>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function saveExpense() {
+  const desc   = document.getElementById('exp-desc').value.trim();
+  const amount = parseFloat(document.getElementById('exp-amount').value);
+  const cat    = document.getElementById('exp-category').value;
+  const date   = document.getElementById('exp-date').value;
+  const comment= document.getElementById('exp-comment').value.trim();
+
+  if (!desc || !amount) { showToast('Заполните описание и сумму', 'red'); return; }
+
+  try {
+    const r = await fetch('/finance/expenses/', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+      body:    JSON.stringify({ description: desc, amount, category: cat, date, comment }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ Расход добавлен!', 'green');
+      document.getElementById('exp-desc').value    = '';
+      document.getElementById('exp-amount').value  = '';
+      document.getElementById('exp-comment').value = '';
+      loadExpenses();
+      loadOperations(currentPeriod, null);
+    } else showToast('Ошибка: ' + d.error, 'red');
+  } catch(e) { showToast('Ошибка сети', 'red'); }
+}
+
+async function deleteExpense(id) {
+  if (!confirm('Удалить этот расход?')) return;
+  try {
+    const r = await fetch('/finance/expenses/' + id + '/delete/', {
+      method:  'DELETE',
+      headers: {'X-CSRFToken': getCookie('csrftoken')},
+    });
+    const d = await r.json();
+    if (d.ok) { showToast('Расход удалён', 'green'); loadExpenses(); loadOperations(currentPeriod, null); }
+  } catch(e) { showToast('Ошибка сети', 'red'); }
+}
+
+// ── Categories ───────────────────────────────────────────────────────────────
+let expenseCats = [];
+let incomeCats  = [];
+
+async function loadCategories() {
+  try {
+    const r = await fetch('/finance/categories/');
+    const d = await r.json();
+    expenseCats = d.expense || [];
+    incomeCats  = d.income  || [];
+    renderCats();
+    loadExpenseCats();
+  } catch(e) { console.error(e); }
+}
+
+async function loadExpenseCats() {
+  try {
+    const r = await fetch('/finance/categories/');
+    const d = await r.json();
+    expenseCats = d.expense || [];
+    const sel = document.getElementById('exp-category');
+    if (sel) {
+      sel.innerHTML = '<option value="">Без категории</option>' +
+        expenseCats.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+  } catch(e) {}
+}
+
+function renderCats() {
+  const expList = document.getElementById('expense-cats-list');
+  const incList = document.getElementById('income-cats-list');
+  if (expList) expList.innerHTML = expenseCats.length
+    ? expenseCats.map((c,i) => `<div class="cat-item"><span class="cat-item-name">${c}</span>
+        <button class="cat-delete" onclick="deleteCategory('expense',${i})">×</button></div>`).join('')
+    : '<div style="color:var(--muted);font-size:13px;padding:8px 0">Нет категорий</div>';
+  if (incList) incList.innerHTML = incomeCats.length
+    ? incomeCats.map((c,i) => `<div class="cat-item"><span class="cat-item-name">${c}</span>
+        <button class="cat-delete" onclick="deleteCategory('income',${i})">×</button></div>`).join('')
+    : '<div style="color:var(--muted);font-size:13px;padding:8px 0">Нет категорий</div>';
+}
+
+async function addCategory(type) {
+  const input = document.getElementById('new-' + type + '-cat');
+  const name  = input.value.trim();
+  if (!name) return;
+  try {
+    const r = await fetch('/finance/categories/', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+      body:    JSON.stringify({ type, name }),
+    });
+    const d = await r.json();
+    if (d.ok) { input.value = ''; loadCategories(); showToast('✅ Категория добавлена', 'green'); }
+  } catch(e) { showToast('Ошибка', 'red'); }
+}
+
+async function deleteCategory(type, index) {
+  const cats = type === 'expense' ? expenseCats : incomeCats;
+  const name = cats[index];
+  try {
+    const r = await fetch('/finance/categories/delete/', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+      body:    JSON.stringify({ type, name }),
+    });
+    const d = await r.json();
+    if (d.ok) { loadCategories(); showToast('Категория удалена', 'green'); }
+  } catch(e) { showToast('Ошибка', 'red'); }
+}
+
+// ── Utils ────────────────────────────────────────────────────────────────────
+function getCookie(n) {
+  const v = document.cookie.match('(^|;)\\s*' + n + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+function showToast(msg, color) {
+  const t = document.createElement('div');
+  t.textContent   = msg;
+  t.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;
+    background:${color==='green'?'#22A06B':'#CC0000'};color:#fff;
+    padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;
+    font-family:Inter,sans-serif;box-shadow:0 4px 20px rgba(0,0,0,.2)`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+// Set today's date as default
+document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
+loadOperations('today', null);
+</script>
+{% endblock %}

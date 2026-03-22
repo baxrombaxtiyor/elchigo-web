@@ -1,0 +1,392 @@
+{% extends 'base.html' %}
+{% block title %}Отчёт по официантам{% endblock %}
+{% block page_title %}Отчёт по официантам{% endblock %}
+
+{% block extra_css %}
+<style>
+.wr-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px;
+  background:#fff;border-radius:14px;padding:14px 18px;border:1px solid var(--grey2)}
+.wr-date-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;border:1.5px solid var(--grey2);
+  border-radius:20px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;
+  color:var(--muted);transition:all .15s;font-family:'Inter',sans-serif}
+.wr-date-btn:hover,.wr-date-btn.active{border-color:var(--dark-red);color:var(--dark-red);background:#fff8f8}
+.wr-date-input{padding:8px 12px;border:1.5px solid var(--grey2);border-radius:10px;
+  font-size:13px;font-family:'Inter',sans-serif;outline:none;color:var(--black)}
+.wr-date-input:focus{border-color:var(--dark-red)}
+.wr-select{padding:8px 14px;border:1.5px solid var(--grey2);border-radius:10px;
+  font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff;cursor:pointer}
+.wr-select:focus{border-color:var(--dark-red)}
+.wr-excel-btn{margin-left:auto;display:flex;align-items:center;gap:6px;padding:9px 18px;
+  background:#16A34A;color:#fff;border:none;border-radius:10px;font-size:13px;
+  font-weight:700;cursor:pointer;font-family:'Barlow',sans-serif;letter-spacing:.3px}
+.wr-excel-btn:hover{background:#15803d}
+
+/* Summary */
+.wr-summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.wr-sum-card{background:#fff;border-radius:14px;padding:16px 18px;border:1px solid var(--grey2)}
+.wr-sum-val{font-family:'Barlow',sans-serif;font-size:22px;font-weight:900;margin-bottom:2px}
+.wr-sum-lbl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+
+/* Chart */
+.wr-chart-wrap{background:#fff;border-radius:14px;border:1px solid var(--grey2);padding:20px;margin-bottom:20px}
+.wr-chart-title{font-family:'Barlow',sans-serif;font-size:15px;font-weight:800;margin-bottom:16px}
+.wr-bars{display:flex;align-items:flex-end;gap:8px;height:140px}
+.wr-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.wr-bar-rect{width:100%;border-radius:6px 6px 0 0;min-height:4px;transition:opacity .15s}
+.wr-bar-rect:hover{opacity:.8}
+.wr-bar-name{font-size:10px;color:var(--muted);text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70px}
+.wr-bar-val{font-size:10px;font-weight:700;color:var(--dark-red)}
+
+/* Table */
+.wr-table-wrap{background:#fff;border-radius:14px;border:1px solid var(--grey2);overflow:hidden;margin-bottom:20px}
+.wr-table-header{padding:16px 20px;border-bottom:1px solid var(--grey2);
+  display:flex;align-items:center;justify-content:space-between}
+.wr-table-title{font-family:'Barlow',sans-serif;font-size:16px;font-weight:800}
+.wr-table{width:100%;border-collapse:collapse}
+.wr-table th{text-align:left;padding:10px 16px;font-size:11px;font-weight:700;
+  color:var(--muted);border-bottom:1px solid var(--grey2);text-transform:uppercase;letter-spacing:.5px}
+.wr-table td{padding:12px 16px;border-bottom:1px solid var(--grey2);font-size:13px}
+.wr-table tr:last-child td{border-bottom:none}
+.wr-table tr:hover td{background:var(--grey)}
+.wr-table .total-row td{background:#fff8f8;font-weight:800;font-size:14px;border-top:2px solid var(--grey2)}
+
+.wr-avatar{width:34px;height:34px;border-radius:9px;background:var(--dark-red);
+  display:flex;align-items:center;justify-content:center;color:#fff;
+  font-weight:800;font-size:14px;font-family:'Barlow',sans-serif}
+.wr-progress{height:4px;background:var(--grey2);border-radius:2px;margin-top:4px}
+.wr-progress-fill{height:4px;background:var(--dark-red);border-radius:2px}
+
+/* Dishes detail */
+.wr-dishes-wrap{background:#fff;border-radius:14px;border:1px solid var(--grey2);overflow:hidden;
+  margin-top:16px;display:none}
+.wr-dishes-wrap.open{display:block}
+.wr-dishes-header{padding:14px 18px;background:#fff8f8;border-bottom:1px solid var(--grey2);
+  display:flex;align-items:center;justify-content:space-between}
+.wr-close-btn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px}
+
+.tag-blue{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;
+  background:#3182CE20;color:#3182CE}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Toolbar -->
+<div class="wr-toolbar">
+  <!-- Период -->
+  <button class="wr-date-btn active" onclick="setPeriod('today',this)">Сегодня</button>
+  <button class="wr-date-btn" onclick="setPeriod('week',this)">Неделя</button>
+  <button class="wr-date-btn" onclick="setPeriod('month',this)">Месяц</button>
+  <button class="wr-date-btn" onclick="setPeriod('custom',this)">Период</button>
+  <span id="custom-dates" style="display:none;align-items:center;gap:6px">
+    <input type="date" class="wr-date-input" id="date-from">
+    <span style="color:var(--muted)">—</span>
+    <input type="date" class="wr-date-input" id="date-to">
+    <button class="wr-date-btn active" onclick="load()">Применить</button>
+  </span>
+
+  <!-- Выбор официанта -->
+  <select class="wr-select" id="waiter-filter" onchange="filterByWaiter()">
+    <option value="">Все официанты</option>
+  </select>
+
+  <!-- Excel -->
+  <button class="wr-excel-btn" onclick="exportExcel()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+    </svg>
+    Скачать Excel
+  </button>
+</div>
+
+<!-- Summary -->
+<div class="wr-summary" id="wr-summary">
+  <div class="wr-sum-card">
+    <div class="wr-sum-val" id="s-total">—</div>
+    <div class="wr-sum-lbl">Всего выручка</div>
+  </div>
+  <div class="wr-sum-card">
+    <div class="wr-sum-val" id="s-orders">—</div>
+    <div class="wr-sum-lbl">Заказов</div>
+  </div>
+  <div class="wr-sum-card">
+    <div class="wr-sum-val" id="s-avg">—</div>
+    <div class="wr-sum-lbl">Средний чек</div>
+  </div>
+  <div class="wr-sum-card">
+    <div class="wr-sum-val" id="s-waiters">—</div>
+    <div class="wr-sum-lbl">Официантов</div>
+  </div>
+</div>
+
+<!-- Chart -->
+<div class="wr-chart-wrap">
+  <div class="wr-chart-title">Выручка по официантам</div>
+  <div class="wr-bars" id="wr-chart">
+    <div style="margin:auto;color:var(--muted);font-size:13px">Загрузка...</div>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="wr-table-wrap">
+  <div class="wr-table-header">
+    <span class="wr-table-title">Детальный отчёт</span>
+    <span id="period-label" style="font-size:13px;color:var(--muted)"></span>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="wr-table" id="wr-table">
+      <thead>
+        <tr>
+          <th>Официант</th>
+          <th>Заказов</th>
+          <th>Выполнено</th>
+          <th>Отменено</th>
+          <th>Выручка</th>
+          <th>Ср. чек</th>
+          <th>Блюда</th>
+        </tr>
+      </thead>
+      <tbody id="wr-tbody">
+        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:30px">Загрузка...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Dishes detail -->
+<div class="wr-dishes-wrap" id="dishes-wrap">
+  <div class="wr-dishes-header">
+    <span style="font-family:'Barlow',sans-serif;font-weight:800;font-size:15px" id="dishes-title">Блюда</span>
+    <button class="wr-close-btn" onclick="closeDishes()">✕</button>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="wr-table">
+      <thead><tr><th>#</th><th>Блюдо</th><th>Кол-во</th><th>Выручка</th></tr></thead>
+      <tbody id="dishes-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPeriod = 'today';
+let allData = [];
+let selectedWaiter = '';
+
+const COLORS = ['#CC0000','#3182CE','#22A06B','#ED8936','#9F7AEA','#0891B2','#B45309'];
+
+function setPeriod(p, btn) {
+  currentPeriod = p;
+  document.querySelectorAll('.wr-date-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const cd = document.getElementById('custom-dates');
+  cd.style.display = p === 'custom' ? 'flex' : 'none';
+  if (p !== 'custom') load();
+}
+
+async function load() {
+  let url = '/reports/api/?period=' + currentPeriod;
+  if (currentPeriod === 'custom') {
+    const from = document.getElementById('date-from').value;
+    const to   = document.getElementById('date-to').value;
+    if (!from || !to) return;
+    url += '&from=' + from + '&to=' + to;
+  }
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+    allData = d.waiters || [];
+    renderWaiterSelect();
+    renderAll();
+    updatePeriodLabel();
+  } catch(e) { console.error(e); }
+}
+
+function updatePeriodLabel() {
+  const labels = {today:'Сегодня', week:'За 7 дней', month:'За месяц', custom:'Выбранный период'};
+  document.getElementById('period-label').textContent = labels[currentPeriod] || '';
+}
+
+function renderWaiterSelect() {
+  const sel = document.getElementById('waiter-filter');
+  sel.innerHTML = '<option value="">Все официанты</option>' +
+    allData.map(w => `<option value="${w.name}">${w.name || '—'}</option>`).join('');
+}
+
+function filterByWaiter() {
+  selectedWaiter = document.getElementById('waiter-filter').value;
+  renderAll();
+}
+
+function getFiltered() {
+  if (!selectedWaiter) return allData;
+  return allData.filter(w => w.name === selectedWaiter);
+}
+
+function fmt(n) {
+  return new Intl.NumberFormat('ru-RU').format(Math.round(n));
+}
+
+function renderAll() {
+  const data = getFiltered();
+  const totalRevenue = data.reduce((s, w) => s + w.revenue, 0);
+  const totalOrders  = data.reduce((s, w) => s + w.orders, 0);
+  const avgCheck     = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  // Summary
+  document.getElementById('s-total').textContent   = fmt(totalRevenue) + ' сум';
+  document.getElementById('s-orders').textContent  = totalOrders;
+  document.getElementById('s-avg').textContent     = fmt(avgCheck) + ' сум';
+  document.getElementById('s-waiters').textContent = data.length;
+
+  // Chart
+  const chart   = document.getElementById('wr-chart');
+  const maxRev  = Math.max(...data.map(w => w.revenue), 1);
+  if (!data.length) {
+    chart.innerHTML = '<div style="margin:auto;color:var(--muted);font-size:13px">Нет данных</div>';
+  } else {
+    chart.innerHTML = data.map((w, i) => {
+      const h    = Math.max(4, Math.round(w.revenue / maxRev * 120));
+      const col  = COLORS[i % COLORS.length];
+      const name = (w.name || '—').split(' ')[0];
+      return `<div class="wr-bar-col" onclick="showDishes('${w.name}')">
+        <div class="wr-bar-val">${fmt(w.revenue)}</div>
+        <div class="wr-bar-rect" style="height:${h}px;background:${col}"></div>
+        <div class="wr-bar-name">${name}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Table
+  const tbody  = document.getElementById('wr-tbody');
+  const maxR   = Math.max(...data.map(w => w.revenue), 1);
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:30px">Нет данных</td></tr>';
+    return;
+  }
+
+  let rows = data.map((w, i) => {
+    const avg = w.orders > 0 ? w.revenue / w.orders : 0;
+    const pct = Math.round(w.revenue / maxR * 100);
+    const col = COLORS[i % COLORS.length];
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="wr-avatar" style="background:${col}">${(w.name||'?')[0].toUpperCase()}</div>
+          <div>
+            <div style="font-weight:700">${w.name || '—'}</div>
+            <div class="wr-progress"><div class="wr-progress-fill" style="width:${pct}%;background:${col}"></div></div>
+          </div>
+        </div>
+      </td>
+      <td style="font-weight:700">${w.orders}</td>
+      <td style="color:#22A06B;font-weight:700">${w.delivered}</td>
+      <td style="color:#CC0000;font-weight:700">${w.cancelled}</td>
+      <td style="font-weight:800;color:var(--dark-red)">${fmt(w.revenue)} сум</td>
+      <td style="color:var(--muted)">${fmt(avg)} сум</td>
+      <td>
+        <button onclick="showDishes('${w.name}')" style="background:#3182CE15;color:#3182CE;
+          border:1.5px solid #3182CE30;border-radius:8px;padding:4px 12px;
+          font-size:12px;font-weight:700;cursor:pointer;font-family:'Barlow',sans-serif">
+          Блюда
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Total row
+  const totalDelivered = data.reduce((s, w) => s + w.delivered, 0);
+  const totalCancelled = data.reduce((s, w) => s + w.cancelled, 0);
+  rows += `<tr class="total-row">
+    <td>Всего</td>
+    <td>${totalOrders}</td>
+    <td style="color:#22A06B">${totalDelivered}</td>
+    <td style="color:#CC0000">${totalCancelled}</td>
+    <td style="color:var(--dark-red)">${fmt(totalRevenue)} сум</td>
+    <td style="color:var(--muted)">${fmt(avgCheck)} сум</td>
+    <td></td>
+  </tr>`;
+
+  tbody.innerHTML = rows;
+}
+
+// ── Dishes detail ──────────────────────────────────────────────────
+async function showDishes(waiterName) {
+  // Загружаем детальные данные через reports_api
+  let url = '/reports/api/?period=' + currentPeriod;
+  if (currentPeriod === 'custom') {
+    url += '&from=' + document.getElementById('date-from').value
+         + '&to=' + document.getElementById('date-to').value;
+  }
+  try {
+    const r = await fetch(url);
+    const d = await r.json();
+
+    // Находим блюда конкретного официанта
+    const w = (d.waiters || []).find(w => w.name === waiterName);
+    const dishes = d.top_dishes || [];
+
+    document.getElementById('dishes-title').textContent = `Блюда — ${waiterName}`;
+    const tbody = document.getElementById('dishes-tbody');
+
+    if (!dishes.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Нет данных</td></tr>';
+    } else {
+      tbody.innerHTML = dishes.map((dish, i) => `
+        <tr>
+          <td style="color:var(--muted);font-weight:700">${i+1}</td>
+          <td style="font-weight:600">${dish.name}</td>
+          <td><span style="font-weight:800">${dish.count}</span> шт</td>
+          <td style="font-weight:800;color:var(--dark-red)">${fmt(dish.revenue)} сум</td>
+        </tr>`).join('');
+    }
+
+    const wrap = document.getElementById('dishes-wrap');
+    wrap.classList.add('open');
+    wrap.scrollIntoView({behavior:'smooth', block:'nearest'});
+  } catch(e) { console.error(e); }
+}
+
+function closeDishes() {
+  document.getElementById('dishes-wrap').classList.remove('open');
+}
+
+// ── Excel export ───────────────────────────────────────────────────
+function exportExcel() {
+  const data = getFiltered();
+  if (!data.length) return;
+
+  let csv = '\uFEFF';
+  csv += 'Отчёт по официантам ELCHIGO\n\n';
+  csv += 'Имя,Заказов,Выполнено,Отменено,Выручка,Средний чек\n';
+  for (const w of data) {
+    const avg = w.orders > 0 ? (w.revenue / w.orders).toFixed(0) : 0;
+    csv += `${w.name||''},${w.orders},${w.delivered},${w.cancelled},${w.revenue.toFixed(0)},${avg}\n`;
+  }
+  const totalRev  = data.reduce((s, w) => s + w.revenue, 0);
+  const totalOrd  = data.reduce((s, w) => s + w.orders, 0);
+  const totalDel  = data.reduce((s, w) => s + w.delivered, 0);
+  const totalCan  = data.reduce((s, w) => s + w.cancelled, 0);
+  const avgCheck  = totalOrd > 0 ? (totalRev / totalOrd).toFixed(0) : 0;
+  csv += `Всего,${totalOrd},${totalDel},${totalCan},${totalRev.toFixed(0)},${avgCheck}\n`;
+
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'waiter_report_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Init
+const today = new Date().toISOString().slice(0,10);
+const week  = new Date(Date.now() - 7*24*3600*1000).toISOString().slice(0,10);
+document.getElementById('date-from').value = week;
+document.getElementById('date-to').value   = today;
+load();
+</script>
+{% endblock %}

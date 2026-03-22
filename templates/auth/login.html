@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ELCHIGO — Вход</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Inter',sans-serif;background:#F2F2F2;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+}
+.login-wrap{
+  background:#fff;border-radius:20px;padding:44px 40px;
+  width:100%;max-width:420px;
+}
+.logo{display:flex;align-items:center;gap:2px;margin-bottom:32px}
+.logo-elchi{font-family:'Barlow',sans-serif;font-weight:900;font-size:28px;color:#111}
+.logo-go{font-family:'Barlow',sans-serif;font-weight:900;font-size:28px;color:#8B0000}
+.logo-sub{font-size:12px;color:#888;margin-left:4px;margin-top:6px}
+
+h2{font-family:'Barlow',sans-serif;font-size:24px;font-weight:800;margin-bottom:6px}
+.subtitle{font-size:14px;color:#888;margin-bottom:28px}
+
+.form-group{margin-bottom:16px}
+.form-label{font-size:12px;font-weight:600;color:#888;margin-bottom:6px;display:block}
+.form-input{
+  width:100%;padding:12px 14px;border:none;border-radius:8px;
+  background:#F2F2F2;font-size:14px;font-family:'Inter',sans-serif;
+  outline:none;transition:box-shadow .15s;
+}
+.form-input:focus{box-shadow:0 0 0 2px #8B0000}
+
+.btn-login{
+  width:100%;padding:14px;background:#8B0000;color:#fff;border:none;
+  border-radius:10px;font-family:'Barlow',sans-serif;font-size:16px;
+  font-weight:700;cursor:pointer;letter-spacing:.5px;
+  transition:background .15s;margin-top:8px;
+}
+.btn-login:hover{background:#6B0000}
+.btn-login:disabled{background:#ccc;cursor:not-allowed}
+
+.error{
+  background:#CC000010;border:1px solid #CC000030;color:#8B0000;
+  border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;
+  display:none;
+}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="logo">
+    <span class="logo-elchi">ELCHI</span>
+    <span class="logo-go">GO</span>
+    <span class="logo-sub">Панель ресторана</span>
+  </div>
+
+  <h2>Добро пожаловать</h2>
+  <p class="subtitle">Войдите в аккаунт ресторана</p>
+
+  <div class="error" id="error-msg"></div>
+
+  <div class="form-group">
+    <label class="form-label">Email</label>
+    <input type="email" class="form-input" id="email" placeholder="restaurant@elchigo.uz">
+  </div>
+  <div class="form-group">
+    <label class="form-label">Пароль</label>
+    <input type="password" class="form-input" id="password" placeholder="••••••••">
+  </div>
+
+  <button class="btn-login" id="loginBtn" onclick="doLogin()">Войти</button>
+  <div style="text-align:center;margin-top:20px;font-size:13px;color:#888">
+    Нет аккаунта? <a href="/register/" style="color:#8B0000;font-weight:600;text-decoration:none">Зарегистрироваться</a>
+  </div>
+</div>
+
+<script>
+// ⚠️ ЗАМЕНИТЕ НА ВАШИ ДАННЫЕ из Firebase Console → Project Settings → Web App
+const firebaseConfig = {
+  apiKey: "AIzaSyBpO6ExODPf-U2pnE-SQ7g99m-VT4BLYj4",
+  authDomain: "elchi-2ffef.firebaseapp.com",
+  projectId: "elchi-2ffef",
+  storageBucket: "elchi-2ffef.firebasestorage.app",
+  messagingSenderId: "796988718541",
+  appId: "1:796988718541:web:402e5e42eaed050b521884",
+  measurementId: "G-5QP3JRT9MT"
+};
+firebase.initializeApp(firebaseConfig);
+
+async function doLogin(){
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const btn      = document.getElementById('loginBtn');
+  const errEl    = document.getElementById('error-msg');
+
+  if(!email || !password){
+    showError('Введите email и пароль');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Входим...';
+  errEl.style.display = 'none';
+
+  try {
+    const cred = await firebase.auth().signInWithEmailAndPassword(email, password);
+    const idToken = await cred.user.getIdToken();
+
+    const csrf = getCookie('csrftoken');
+    const res = await fetch('/', {
+      method: 'POST',
+      headers: {'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken':csrf},
+      body: new URLSearchParams({idToken}),
+    });
+    const data = await res.json();
+
+    if(data.ok) window.location.href = '/dashboard/';
+    else showError(data.error || 'Ошибка входа');
+  } catch(e) {
+    const msgs = {
+      'auth/user-not-found':'Пользователь не найден',
+      'auth/wrong-password':'Неверный пароль',
+      'auth/invalid-email':'Неверный email',
+      'auth/too-many-requests':'Слишком много попыток',
+    };
+    showError(msgs[e.code] || e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Войти';
+  }
+}
+
+function showError(msg){
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function getCookie(name){
+  const v = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'Enter') doLogin();
+});
+</script>
+</body>
+</html>

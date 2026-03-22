@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Меню — Стол {{ table_id }}</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;800;900&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Barlow',sans-serif;background:#F5F5F5;color:#111;min-height:100vh;padding-bottom:80px}
+
+  .header{background:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;border-bottom:1px solid #E5E5E5;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .header-title{font-weight:900;font-size:20px}
+  .header-table{font-size:13px;color:#888;font-weight:600}
+  .cart-btn{background:#8B0000;color:#fff;border:none;border-radius:12px;padding:10px 18px;font-family:'Barlow',sans-serif;font-weight:800;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .2s}
+  .cart-btn:hover{background:#6a0000}
+  .cart-count{background:#fff;color:#8B0000;border-radius:50%;width:20px;height:20px;font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:900}
+
+  .cats-nav{background:#fff;padding:0 20px;display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid #E5E5E5;scrollbar-width:none}
+  .cats-nav::-webkit-scrollbar{display:none}
+  .cat-tab{padding:12px 14px;font-weight:700;font-size:13px;white-space:nowrap;cursor:pointer;color:#888;border-bottom:3px solid transparent;transition:.2s}
+  .cat-tab.active{color:#8B0000;border-bottom-color:#8B0000}
+
+  .action-bar{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:16px 20px;background:#fff;border-bottom:1px solid #E5E5E5}
+  .action-card{border:1.5px solid #E5E5E5;border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .15s;background:#fff}
+  .action-card:active{background:#F5F5F5}
+  .action-card.waiter{border-color:#ED8936}
+  .action-card.bill{border-color:#22A06B}
+  .action-icon{font-size:22px;flex-shrink:0}
+  .action-text{font-size:12px;font-weight:700;line-height:1.3}
+  .action-text.waiter{color:#ED8936}
+  .action-text.bill{color:#22A06B}
+
+  .content{padding:20px;max-width:700px;margin:0 auto}
+  .cat-section{margin-bottom:32px}
+  .cat-title{font-weight:900;font-size:18px;margin-bottom:14px}
+
+  .dish-card{background:#fff;border-radius:14px;padding:14px;display:flex;gap:12px;margin-bottom:10px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+  .dish-img{width:72px;height:72px;border-radius:10px;object-fit:cover;background:#F2F2F2;flex-shrink:0}
+  .dish-img-placeholder{width:72px;height:72px;border-radius:10px;background:#F2F2F2;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+  .dish-info{flex:1;min-width:0}
+  .dish-name{font-weight:700;font-size:15px;margin-bottom:4px}
+  .dish-desc{font-size:12px;color:#888;margin-bottom:6px;line-height:1.4}
+  .dish-price{font-weight:900;font-size:15px;color:#8B0000}
+  .dish-actions{flex-shrink:0}
+
+  .counter{display:flex;align-items:center;gap:8px}
+  .counter-btn{width:32px;height:32px;border-radius:50%;border:2px solid #8B0000;background:#fff;color:#8B0000;font-size:18px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.2s;line-height:1}
+  .counter-btn:hover{background:#8B0000;color:#fff}
+  .counter-val{font-weight:900;font-size:16px;min-width:20px;text-align:center}
+  .add-btn{background:#8B0000;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-family:'Barlow',sans-serif;font-weight:800;font-size:13px;cursor:pointer;transition:.2s;white-space:nowrap}
+  .add-btn:hover{background:#6a0000}
+
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end}
+  .modal-bg.open{display:flex}
+  .modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:24px 20px}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+  .modal-title{font-weight:900;font-size:20px}
+  .close-btn{background:none;border:none;font-size:28px;cursor:pointer;color:#888;line-height:1;padding:0}
+  .cart-item{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #F2F2F2}
+  .cart-item-name{flex:1;font-weight:600;font-size:14px}
+  .cart-item-price{font-weight:800;color:#8B0000;font-size:13px;white-space:nowrap}
+  .total-row{display:flex;justify-content:space-between;align-items:center;padding:16px 0;font-weight:900;font-size:18px}
+  .order-btn{width:100%;background:#8B0000;color:#fff;border:none;border-radius:14px;padding:16px;font-family:'Barlow',sans-serif;font-weight:900;font-size:16px;cursor:pointer;transition:.2s}
+  .order-btn:hover{background:#6a0000}
+  .order-btn:disabled{background:#ccc;cursor:not-allowed}
+  .empty-cart{text-align:center;padding:40px;color:#888;font-size:15px}
+  .comment-area{width:100%;border:1.5px solid #E5E5E5;border-radius:10px;padding:12px;font-family:'Barlow',sans-serif;font-size:14px;resize:none;margin-bottom:16px;outline:none;margin-top:12px}
+  .comment-area:focus{border-color:#8B0000}
+
+  .call-option{display:flex;align-items:center;gap:14px;padding:16px;border:1.5px solid #E5E5E5;border-radius:12px;cursor:pointer;margin-bottom:10px;transition:all .15s}
+  .call-option:active{background:#F5F5F5}
+  .call-option-icon{font-size:28px;flex-shrink:0}
+  .call-option-title{font-weight:800;font-size:15px}
+  .call-option-sub{font-size:12px;color:#888;margin-top:2px}
+  .call-option.waiter{border-color:#ED893660}
+  .call-option.bill{border-color:#22A06B60}
+
+  .success-screen{display:none;position:fixed;inset:0;background:#fff;z-index:300;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px}
+  .success-screen.open{display:flex}
+  .success-icon{width:88px;height:88px;background:#e8f5e9;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-bottom:24px}
+  .success-title{font-weight:900;font-size:26px;margin-bottom:10px}
+  .success-sub{color:#888;font-size:15px;margin-bottom:36px;line-height:1.6}
+  .back-btn{background:#8B0000;color:#fff;border:none;border-radius:14px;padding:14px 36px;font-family:'Barlow',sans-serif;font-weight:900;font-size:16px;cursor:pointer}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:999;white-space:nowrap;animation:toastIn .3s ease}
+  @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+  .loading{text-align:center;padding:80px;color:#888;font-size:16px}
+  .error-msg{text-align:center;padding:80px;color:#8B0000;font-size:16px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title" id="rest-name">Загрузка...</div>
+    <div class="header-table" id="table-label">Стол...</div>
+  </div>
+  <button class="cart-btn" onclick="openCart()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 001.95-1.56L23 6H6"/></svg>
+    Корзина
+    <span class="cart-count" id="cart-count">0</span>
+  </button>
+</div>
+
+<div class="cats-nav" id="cats-nav"></div>
+
+<div class="action-bar">
+  <div class="action-card waiter" onclick="openCallModal('waiter')">
+    <div class="action-icon">🛎</div>
+    <div class="action-text waiter">Вызвать<br>официанта</div>
+  </div>
+  <div class="action-card bill" onclick="openCallModal('bill')">
+    <div class="action-icon">🧾</div>
+    <div class="action-text bill">Попросить<br>счёт</div>
+  </div>
+</div>
+
+<div class="content" id="menu-content">
+  <div class="loading">Загружаем меню...</div>
+</div>
+
+<!-- Modal: Корзина -->
+<div class="modal-bg" id="cart-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Корзина</div>
+      <button class="close-btn" onclick="closeCart()">×</button>
+    </div>
+    <div id="cart-items"></div>
+    <textarea class="comment-area" id="order-comment" rows="2" placeholder="Комментарий к заказу (необязательно)"></textarea>
+    <div class="total-row">
+      <span>Итого</span>
+      <span id="cart-total">0 сум</span>
+    </div>
+    <button class="order-btn" id="order-btn" onclick="placeOrder()">Оформить заказ</button>
+  </div>
+</div>
+
+<!-- Modal: Вызов официанта / счёт -->
+<div class="modal-bg" id="call-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="call-modal-title">Вызов</div>
+      <button class="close-btn" onclick="closeCallModal()">×</button>
+    </div>
+    <div id="call-modal-body"></div>
+  </div>
+</div>
+
+<!-- Экран успеха -->
+<div class="success-screen" id="success-screen">
+  <div class="success-icon">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  </div>
+  <div class="success-title" id="success-title">Заказ принят!</div>
+  <div class="success-sub" id="success-sub">Ваш заказ передан официанту.<br>Ожидайте, пожалуйста.</div>
+  <button class="back-btn" onclick="backToMenu()">Вернуться в меню</button>
+</div>
+
+<script>
+const RESTAURANT_ID   = '{{ restaurant_id }}';
+const TABLE_ID        = '{{ table_id }}';
+const FIREBASE_CONFIG = {{ firebase_config_json|safe }};
+const BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents`;
+
+let cart      = {};
+let menuData  = [];
+let tableNum  = TABLE_ID;
+// ── ВАЖНО: waiterId берётся из документа стола при загрузке ──
+let tableWaiterId   = '';
+let tableWaiterName = '';
+
+// ── Helpers ────────────────────────────────────────────────────────
+function fieldStr(fields, key)       { return fields?.[key]?.stringValue || ''; }
+function fieldInt(fields, key)       { return parseInt(fields?.[key]?.integerValue || fields?.[key]?.doubleValue || 0); }
+function fieldBool(fields, key, def) { const v = fields?.[key]; if(!v) return def; return v.booleanValue !== false; }
+
+// ── Load menu ──────────────────────────────────────────────────────
+async function loadMenu() {
+  try {
+    // Ресторан
+    const restRes  = await fetch(`${BASE}/restaurants/${RESTAURANT_ID}`);
+    const restData = await restRes.json();
+    if (restData.fields) {
+      const name = fieldStr(restData.fields, 'name') || 'Меню';
+      document.getElementById('rest-name').textContent = name;
+      document.title = name + ' — Меню';
+    }
+
+    // Стол — получаем номер, waiterId и waiterName
+    const tableRes  = await fetch(`${BASE}/restaurants/${RESTAURANT_ID}/tables/${TABLE_ID}`);
+    const tableData = await tableRes.json();
+    if (tableData.fields) {
+      tableNum = tableData.fields?.number?.integerValue
+              || tableData.fields?.number?.stringValue
+              || TABLE_ID;
+      document.getElementById('table-label').textContent = 'Стол ' + tableNum;
+
+      // ── Сохраняем waiterId и waiterName из стола ──────────────────
+      tableWaiterId   = fieldStr(tableData.fields, 'waiterId');
+      tableWaiterName = fieldStr(tableData.fields, 'waiterName');
+    }
+
+    // Категории
+    const catsRes  = await fetch(`${BASE}/restaurants/${RESTAURANT_ID}/categories`);
+    const catsData = await catsRes.json();
+    if (!catsData.documents || !catsData.documents.length) {
+      document.getElementById('menu-content').innerHTML = '<div class="error-msg">Меню пока пусто</div>';
+      return;
+    }
+
+    const sortedCats = [...catsData.documents].sort((a,b) =>
+      fieldInt(a.fields,'order') - fieldInt(b.fields,'order')
+    );
+
+    menuData = [];
+    for (const cat of sortedCats) {
+      const catId   = cat.name.split('/').pop();
+      const catName = fieldStr(cat.fields, 'name');
+      if (!catName) continue;
+
+      const dishRes  = await fetch(`${BASE}/restaurants/${RESTAURANT_ID}/categories/${catId}/dishes`);
+      const dishData = await dishRes.json();
+      const dishes   = (dishData.documents || [])
+        .map(d => ({
+          id:          d.name.split('/').pop(),
+          name:        fieldStr(d.fields, 'name'),
+          description: fieldStr(d.fields, 'description'),
+          price:       fieldInt(d.fields, 'price'),
+          imageUrl:    fieldStr(d.fields, 'imageUrl'),
+          isAvailable: fieldBool(d.fields, 'isAvailable', true),
+          order:       fieldInt(d.fields, 'order'),
+        }))
+        .filter(d => d.isAvailable && d.name)
+        .sort((a,b) => a.order - b.order);
+
+      if (dishes.length) menuData.push({ id: catId, name: catName, dishes });
+    }
+
+    if (!menuData.length) {
+      document.getElementById('menu-content').innerHTML = '<div class="error-msg">Меню пока пусто</div>';
+      return;
+    }
+    renderMenu();
+  } catch(e) {
+    console.error(e);
+    document.getElementById('menu-content').innerHTML =
+      '<div class="error-msg">Ошибка загрузки меню.<br>Попробуйте обновить страницу.</div>';
+  }
+}
+
+function renderMenu() {
+  document.getElementById('cats-nav').innerHTML = menuData.map((c,i) =>
+    `<div class="cat-tab ${i===0?'active':''}" onclick="scrollToCat('${c.id}',this)">${c.name}</div>`
+  ).join('');
+
+  document.getElementById('menu-content').innerHTML = menuData.map(cat => `
+    <div class="cat-section" id="cat-${cat.id}">
+      <div class="cat-title">${cat.name}</div>
+      ${cat.dishes.map(dish => `
+        <div class="dish-card" id="card-${dish.id}">
+          ${dish.imageUrl
+            ? `<img src="${dish.imageUrl}" class="dish-img" onerror="this.style.display='none'">`
+            : `<div class="dish-img-placeholder">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ddd" stroke-width="2">
+                  <path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3"/>
+                </svg></div>`
+          }
+          <div class="dish-info">
+            <div class="dish-name">${dish.name}</div>
+            ${dish.description ? `<div class="dish-desc">${dish.description}</div>` : ''}
+            <div class="dish-price">${dish.price.toLocaleString('ru-RU')} сум</div>
+          </div>
+          <div class="dish-actions" id="actions-${dish.id}">
+            <button class="add-btn"
+              onclick="addToCart(this.dataset.id,this.dataset.catid,this.dataset.name,this.dataset.price)"
+              data-id="${dish.id}"
+              data-catid="${cat.id}"
+              data-name="${dish.name.replace(/"/g,'&quot;')}"
+              data-price="${dish.price}">
+              + Добавить
+            </button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+function scrollToCat(catId, el) {
+  document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const s = document.getElementById('cat-' + catId);
+  if (s) s.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ── Cart ──────────────────────────────────────────────────────────
+function addToCart(dishId, catId, name, price) {
+  if (cart[dishId]) cart[dishId].qty++;
+  else cart[dishId] = { name, price: Number(price), qty: 1, catId };
+  updateDishActions(dishId);
+  updateCartCount();
+}
+
+function changeQty(dishId, delta) {
+  if (!cart[dishId]) return;
+  cart[dishId].qty += delta;
+  if (cart[dishId].qty <= 0) delete cart[dishId];
+  updateDishActions(dishId);
+  updateCartCount();
+  renderCartItems();
+}
+
+function updateDishActions(dishId) {
+  const el   = document.getElementById('actions-' + dishId);
+  if (!el) return;
+  const item = cart[dishId];
+  if (item) {
+    el.innerHTML = `<div class="counter">
+      <button class="counter-btn" onclick="changeQty('${dishId}',-1)">−</button>
+      <span class="counter-val">${item.qty}</span>
+      <button class="counter-btn" onclick="changeQty('${dishId}',1)">+</button>
+    </div>`;
+  } else {
+    let name='', price=0, catId='';
+    for (const cat of menuData) {
+      const d = cat.dishes.find(d => d.id === dishId);
+      if (d) { name=d.name; price=d.price; catId=cat.id; break; }
+    }
+    el.innerHTML = `<button class="add-btn"
+  onclick="addToCart(this.dataset.id,this.dataset.catid,this.dataset.name,this.dataset.price)"
+  data-id="${dishId}"
+  data-catid="${catId}"
+  data-name="${name.replace(/"/g,'&quot;')}"
+  data-price="${price}">
+  + Добавить</button>`;
+  }
+}
+
+function updateCartCount() {
+  document.getElementById('cart-count').textContent =
+    Object.values(cart).reduce((s,i) => s+i.qty, 0);
+}
+
+function openCart()  { renderCartItems(); document.getElementById('cart-modal').classList.add('open'); }
+function closeCart() { document.getElementById('cart-modal').classList.remove('open'); }
+
+function renderCartItems() {
+  const container = document.getElementById('cart-items');
+  const items = Object.entries(cart);
+  if (!items.length) {
+    container.innerHTML = '<div class="empty-cart">Корзина пуста</div>';
+    document.getElementById('cart-total').textContent = '0 сум';
+    document.getElementById('order-btn').disabled = true;
+    return;
+  }
+  document.getElementById('order-btn').disabled = false;
+  let total = 0;
+  container.innerHTML = items.map(([id, item]) => {
+    total += item.price * item.qty;
+    return `<div class="cart-item">
+      <div class="cart-item-name">${item.name}</div>
+      <div class="cart-item-price">${item.price.toLocaleString('ru-RU')} сум</div>
+      <div class="counter">
+        <button class="counter-btn" onclick="changeQty('${id}',-1)" style="width:28px;height:28px;font-size:15px">−</button>
+        <span class="counter-val">${item.qty}</span>
+        <button class="counter-btn" onclick="changeQty('${id}',1)" style="width:28px;height:28px;font-size:15px">+</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('cart-total').textContent = total.toLocaleString('ru-RU') + ' сум';
+}
+
+// ── Place order ───────────────────────────────────────────────────
+async function placeOrder() {
+  const items = Object.entries(cart);
+  if (!items.length) return;
+  const btn = document.getElementById('order-btn');
+  btn.disabled = true;
+  btn.textContent = 'Оформляем...';
+
+  const comment    = document.getElementById('order-comment').value.trim();
+  const totalPrice = items.reduce((s,[,i]) => s + i.price*i.qty, 0);
+
+  // ── Если waiterId ещё не загружен — получаем из стола повторно ──
+  let waiterId   = tableWaiterId;
+  let waiterName = tableWaiterName;
+  if (!waiterId) {
+    try {
+      const tableRes  = await fetch(`${BASE}/restaurants/${RESTAURANT_ID}/tables/${TABLE_ID}`);
+      const tableData = await tableRes.json();
+      waiterId   = fieldStr(tableData.fields, 'waiterId');
+      waiterName = fieldStr(tableData.fields, 'waiterName');
+    } catch(e) {
+      console.warn('Не удалось получить waiterId:', e);
+    }
+  }
+
+  const body = {
+    fields: {
+      restaurantId: { stringValue: RESTAURANT_ID },
+      tableId:      { stringValue: String(TABLE_ID) },
+      tableNumber:  { stringValue: String(tableNum) },
+      // ── Привязка к официанту ──────────────────────────────────────
+      waiterId:     { stringValue: waiterId },
+      waiterName:   { stringValue: waiterName },
+      // ─────────────────────────────────────────────────────────────
+      status:       { stringValue: 'pending' },
+      totalPrice:   { integerValue: String(totalPrice) },
+      comment:      { stringValue: comment },
+      source:       { stringValue: 'qr' },
+      createdAt:    { timestampValue: new Date().toISOString() },
+      items: {
+        arrayValue: {
+          values: items.map(([id, item]) => ({
+            mapValue: { fields: {
+              dishId:   { stringValue: id },
+              dishName: { stringValue: item.name },
+              quantity: { integerValue: String(item.qty) },
+              price:    { integerValue: String(item.price) },
+              total:    { integerValue: String(item.price * item.qty) },
+            }}
+          }))
+        }
+      }
+    }
+  };
+
+  try {
+    const res = await fetch(`${BASE}/orders?key=${FIREBASE_CONFIG.apiKey}`, {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    cart = {};
+    updateCartCount();
+    closeCart();
+    showSuccess();
+  } catch(e) {
+    console.error(e);
+    alert('Ошибка при оформлении заказа. Попробуйте снова.');
+    btn.disabled = false;
+    btn.textContent = 'Оформить заказ';
+  }
+}
+
+// ── Call waiter / bill ────────────────────────────────────────────
+function openCallModal(type) {
+  const title = document.getElementById('call-modal-title');
+  const body  = document.getElementById('call-modal-body');
+
+  if (type === 'waiter') {
+    title.textContent = '🛎 Вызов официанта';
+    body.innerHTML = `
+      <p style="color:#888;font-size:14px;margin-bottom:20px;line-height:1.5">
+        Официант подойдёт к вашему столику в ближайшее время.
+      </p>
+      <div class="call-option waiter" onclick="sendCall('waiter')">
+        <div class="call-option-icon">🛎</div>
+        <div>
+          <div class="call-option-title" style="color:#ED8936">Вызвать официанта</div>
+          <div class="call-option-sub">Нужна помощь или есть вопросы</div>
+        </div>
+      </div>
+      <button class="order-btn" style="background:#fff;color:#888;border:1.5px solid #E5E5E5;margin-top:8px"
+        onclick="closeCallModal()">Отмена</button>`;
+  } else {
+    title.textContent = '🧾 Счёт';
+    body.innerHTML = `
+      <p style="color:#888;font-size:14px;margin-bottom:20px;line-height:1.5">
+        Официант принесёт счёт к вашему столику.
+      </p>
+      <div class="call-option bill" onclick="sendCall('bill')">
+        <div class="call-option-icon">🧾</div>
+        <div>
+          <div class="call-option-title" style="color:#22A06B">Попросить счёт</div>
+          <div class="call-option-sub">Готовы к оплате</div>
+        </div>
+      </div>
+      <button class="order-btn" style="background:#fff;color:#888;border:1.5px solid #E5E5E5;margin-top:8px"
+        onclick="closeCallModal()">Отмена</button>`;
+  }
+  document.getElementById('call-modal').classList.add('open');
+}
+
+function closeCallModal() {
+  document.getElementById('call-modal').classList.remove('open');
+}
+
+async function sendCall(reason) {
+  closeCallModal();
+  try {
+    await fetch(`${BASE}/manager_calls?key=${FIREBASE_CONFIG.apiKey}`, {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ fields: {
+        restaurantId: { stringValue: RESTAURANT_ID },
+        tableId:      { stringValue: String(TABLE_ID) },
+        tableNumber:  { stringValue: String(tableNum) },
+        waiterId:     { stringValue: tableWaiterId },
+        reason:       { stringValue: reason },
+        status:       { stringValue: 'pending' },
+        createdAt:    { timestampValue: new Date().toISOString() },
+      }}),
+    });
+    if (reason === 'bill') {
+      showToast('🧾 Счёт запрошен! Официант скоро подойдёт');
+    } else {
+      showToast('🛎 Официант вызван! Ожидайте');
+    }
+  } catch(e) {
+    showToast('Ошибка. Попробуйте снова.');
+  }
+}
+
+// ── Success screen ────────────────────────────────────────────────
+function showSuccess() {
+  document.getElementById('success-title').textContent = 'Заказ принят!';
+  document.getElementById('success-sub').innerHTML =
+    tableWaiterName
+      ? `Ваш заказ передан официанту <b>${tableWaiterName}</b>.<br>Ожидайте, пожалуйста.`
+      : 'Ваш заказ передан официанту.<br>Ожидайте, пожалуйста.';
+  document.getElementById('success-screen').classList.add('open');
+}
+
+function backToMenu() {
+  document.getElementById('success-screen').classList.remove('open');
+  for (const cat of menuData)
+    for (const dish of cat.dishes) updateDishActions(dish.id);
+}
+
+// ── Toast ─────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className   = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+document.querySelectorAll('.modal-bg').forEach(bg =>
+  bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); })
+);
+
+loadMenu();
+</script>
+</body>
+</html>

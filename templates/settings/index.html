@@ -1,0 +1,790 @@
+{% extends 'base.html' %}
+{% block title %}Настройки{% endblock %}
+{% block page_title %}Настройки{% endblock %}
+
+{% block extra_css %}
+<style>
+.settings-layout{display:grid;grid-template-columns:240px 1fr;gap:20px;align-items:start}
+
+/* Sidebar */
+.settings-nav{background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--grey2);position:sticky;top:20px}
+.settings-nav-title{padding:14px 16px;font-family:'Barlow',sans-serif;font-size:11px;font-weight:800;
+  color:var(--muted);letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--grey2)}
+.settings-nav-item{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;
+  font-size:14px;font-weight:600;color:var(--muted);transition:all .15s;border-left:3px solid transparent}
+.settings-nav-item:hover{background:var(--grey);color:var(--black)}
+.settings-nav-item.active{background:#CC000008;color:var(--dark-red);border-left-color:var(--dark-red)}
+.settings-nav-item svg{width:16px;height:16px;flex-shrink:0}
+
+/* Sections */
+.settings-section{display:none}
+.settings-section.active{display:block}
+.section-title{font-family:'Barlow',sans-serif;font-size:20px;font-weight:900;
+  margin-bottom:4px;color:var(--black)}
+.section-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
+
+/* Cards */
+.setting-card{background:#fff;border-radius:14px;border:1px solid var(--grey2);margin-bottom:14px;overflow:hidden}
+.setting-card-header{padding:14px 18px;border-bottom:1px solid var(--grey2);
+  font-family:'Barlow',sans-serif;font-size:14px;font-weight:800;color:var(--black)}
+.setting-card-body{padding:18px}
+.setting-row{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0;border-bottom:1px solid var(--grey2)}
+.setting-row:last-child{border-bottom:none;padding-bottom:0}
+.setting-row-info .sr-title{font-weight:700;font-size:14px;margin-bottom:2px}
+.setting-row-info .sr-sub{font-size:12px;color:var(--muted)}
+
+/* Toggle */
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+.toggle input{display:none}
+.toggle-slider{position:absolute;inset:0;background:#E5E5E5;border-radius:12px;transition:.2s;cursor:pointer}
+.toggle-slider:before{content:'';position:absolute;width:18px;height:18px;
+  left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;
+  box-shadow:0 1px 4px rgba(0,0,0,.2)}
+input:checked+.toggle-slider{background:#22A06B}
+input:checked+.toggle-slider:before{transform:translateX(20px)}
+
+/* Payment methods */
+.payment-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.payment-card{border:2px solid var(--grey2);border-radius:12px;padding:14px;
+  text-align:center;cursor:pointer;transition:all .15s}
+.payment-card:hover{border-color:#ccc}
+.payment-card.active{border-color:var(--dark-red);background:#CC000008}
+.payment-card .pm-icon{font-size:24px;margin-bottom:6px}
+.payment-card .pm-name{font-size:12px;font-weight:700}
+.payment-card .pm-toggle{margin-top:8px}
+
+/* Receipt preview */
+.receipt-preview{background:#fff;border:1px dashed #ccc;border-radius:8px;
+  padding:16px;font-family:'Courier New',monospace;font-size:12px;
+  max-width:280px;margin:0 auto}
+.receipt-preview .rp-center{text-align:center}
+.receipt-preview .rp-line{border-top:1px dashed #ccc;margin:8px 0}
+.receipt-preview .rp-row{display:flex;justify-content:space-between;margin:3px 0}
+
+/* Schedule */
+.schedule-row{display:flex;align-items:center;gap:12px;padding:11px 0;
+  border-bottom:1px solid var(--grey2)}
+.schedule-row:last-child{border-bottom:none}
+.day-label{width:34px;font-family:'Barlow',sans-serif;font-weight:800;
+  font-size:13px;color:var(--black)}
+.time-input{padding:7px 10px;background:var(--grey);border:1.5px solid transparent;
+  border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;
+  width:86px;outline:none;transition:.15s}
+.time-input:focus{border-color:var(--dark-red);background:#fff}
+.time-sep{color:var(--muted);font-size:13px}
+
+/* Security */
+.pwd-input-wrap{position:relative}
+.pwd-input-wrap input{padding-right:44px}
+.pwd-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:0}
+
+/* Notifications */
+.notif-list{display:flex;flex-direction:column;gap:0}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="settings-layout">
+
+  <!-- Sidebar nav -->
+  <div class="settings-nav">
+    <div class="settings-nav-title">Настройки</div>
+    <div class="settings-nav-item active" onclick="showSection('general',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      Основное
+    </div>
+    <div class="settings-nav-item" onclick="showSection('payments',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+      </svg>
+      Способы оплаты
+    </div>
+    <div class="settings-nav-item" onclick="showSection('receipt',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      </svg>
+      Настройка чека
+    </div>
+    <div class="settings-nav-item" onclick="showSection('notifications',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+      </svg>
+      Уведомления
+    </div>
+    <div class="settings-nav-item" onclick="showSection('security',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+      </svg>
+      Безопасность
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div>
+
+    <!-- ── ОСНОВНОЕ ── -->
+    <div class="settings-section active" id="section-general">
+      <div class="section-title">Основное</div>
+      <div class="section-sub">Название, статус и расписание ресторана</div>
+
+      <!-- Статус -->
+      <div class="setting-card">
+        <div class="setting-card-header">Статус ресторана</div>
+        <div class="setting-card-body">
+          <div class="setting-row">
+            <div class="setting-row-info">
+              <div class="sr-title" id="status-title">
+                {% if restaurant.isOpen %}Ресторан открыт{% else %}Ресторан закрыт{% endif %}
+              </div>
+              <div class="sr-sub" id="status-sub">
+                {% if restaurant.isOpen %}Клиенты могут делать заказы{% else %}Заказы не принимаются{% endif %}
+              </div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="is-open"
+                {% if restaurant.isOpen %}checked{% endif %}
+                onchange="updateStatus()">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Название -->
+      <div class="setting-card">
+        <div class="setting-card-header">Название ресторана</div>
+        <div class="setting-card-body">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Название</label>
+            <input class="form-input" id="rest-name" value="{{ restaurant.name }}"
+              placeholder="Например: ELCHIGO Choyhona">
+          </div>
+        </div>
+      </div>
+
+      <!-- Расписание -->
+      <div class="setting-card">
+        <div class="setting-card-header">Расписание работы</div>
+        <div class="setting-card-body" id="schedule-body" style="padding:12px 18px"></div>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveGeneral()"
+        style="width:100%;justify-content:center;padding:14px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+        </svg>
+        Сохранить изменения
+      </button>
+    </div>
+
+    <!-- ── СПОСОБЫ ОПЛАТЫ ── -->
+    <div class="settings-section" id="section-payments">
+      <div class="section-title">Способы оплаты</div>
+      <div class="section-sub">Включите или отключите доступные методы оплаты</div>
+
+      <div class="setting-card">
+        <div class="setting-card-header">Доступные методы</div>
+        <div class="setting-card-body">
+          <div id="payment-methods-list"></div>
+        </div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-card-header">Добавить новый метод</div>
+        <div class="setting-card-body">
+          <div style="display:flex;gap:10px">
+            <input class="form-input" id="new-payment-name"
+              placeholder="Например: Uzum Pay" style="flex:1">
+            <button class="btn btn-primary" onclick="addPaymentMethod()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Добавить
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="savePayments()"
+        style="width:100%;justify-content:center;padding:14px">
+        Сохранить способы оплаты
+      </button>
+    </div>
+
+    <!-- ── НАСТРОЙКА ЧЕКА ── -->
+    <div class="settings-section" id="section-receipt">
+      <div class="section-title">Настройка чека</div>
+      <div class="section-sub">Настройте внешний вид и содержимое чека</div>
+
+      <div style="display:grid;grid-template-columns:1fr 280px;gap:20px;align-items:start">
+        <div>
+          <div class="setting-card">
+            <div class="setting-card-header">Шапка чека</div>
+            <div class="setting-card-body">
+              <div class="form-group">
+                <label class="form-label">Название (в чеке)</label>
+                <input class="form-input" id="receipt-name"
+                  placeholder="ELCHIGO" value="{{ restaurant.name }}">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Подзаголовок</label>
+                <input class="form-input" id="receipt-subtitle"
+                  placeholder="Choyhona & Restaurant" id="receipt-subtitle">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Адрес</label>
+                <input class="form-input" id="receipt-address"
+                  placeholder="г. Ташкент, ул. Амира Темура 1">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Телефон</label>
+                <input class="form-input" id="receipt-phone"
+                  placeholder="+998 90 123 45 67">
+              </div>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-card-header">Подвал чека</div>
+            <div class="setting-card-body">
+              <div class="form-group">
+                <label class="form-label">Прощальный текст</label>
+                <input class="form-input" id="receipt-footer"
+                  value="Рахмат! Яна келинг 🙏">
+              </div>
+            </div>
+          </div>
+
+          <div class="setting-card">
+            <div class="setting-card-header">Что показывать в чеке</div>
+            <div class="setting-card-body">
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <div class="sr-title">Имя официанта</div>
+                  <div class="sr-sub">Показывать имя официанта в чеке</div>
+                </div>
+                <label class="toggle">
+                  <input type="checkbox" id="show-waiter" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <div class="sr-title">Имя кассира</div>
+                  <div class="sr-sub">Показывать имя кассира в чеке</div>
+                </div>
+                <label class="toggle">
+                  <input type="checkbox" id="show-cashier" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="setting-row">
+                <div class="setting-row-info">
+                  <div class="sr-title">QR-код</div>
+                  <div class="sr-sub">Добавить QR-код в чек</div>
+                </div>
+                <label class="toggle">
+                  <input type="checkbox" id="show-qr" onchange="updatePreview()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div style="position:sticky;top:20px">
+          <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:8px;font-weight:600">ПРЕДПРОСМОТР</div>
+          <div class="receipt-preview" id="receipt-preview">
+            <div class="rp-center" style="font-weight:900;font-size:14px" id="prev-name">ELCHIGO</div>
+            <div class="rp-center" style="color:#888;font-size:11px" id="prev-subtitle"></div>
+            <div class="rp-center" style="color:#888;font-size:10px" id="prev-address"></div>
+            <div class="rp-center" style="color:#888;font-size:10px" id="prev-phone"></div>
+            <div class="rp-line"></div>
+            <div class="rp-row"><span>Стол</span><span>5</span></div>
+            <div class="rp-row"><span>Официант</span><span>Алишер</span></div>
+            <div class="rp-row"><span>Кассир</span><span>Баходир</span></div>
+            <div class="rp-row"><span>Дата</span><span>16.03.2026</span></div>
+            <div class="rp-line"></div>
+            <div class="rp-row"><span>Плов</span><span></span></div>
+            <div class="rp-row"><span style="color:#888">1 × 45000</span><span>45 000</span></div>
+            <div class="rp-row"><span>Лагман</span><span></span></div>
+            <div class="rp-row"><span style="color:#888">2 × 35000</span><span>70 000</span></div>
+            <div class="rp-line"></div>
+            <div class="rp-row" style="font-weight:900"><span>ИТОГО</span><span>115 000 сум</span></div>
+            <div class="rp-line"></div>
+            <div class="rp-center" style="color:#888;font-size:11px" id="prev-footer">Рахмат! Яна келинг 🙏</div>
+            <div class="rp-center" style="color:#ccc;font-size:10px;margin-top:4px">— — —</div>
+          </div>
+          <button class="btn btn-outline" onclick="saveReceipt()"
+            style="width:100%;justify-content:center;margin-top:12px">
+            Сохранить
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── УВЕДОМЛЕНИЯ ── -->
+    <div class="settings-section" id="section-notifications">
+      <div class="section-title">Уведомления</div>
+      <div class="section-sub">Настройте какие уведомления получать</div>
+
+      <div class="setting-card">
+        <div class="setting-card-header">Заказы</div>
+        <div class="setting-card-body">
+          <div class="setting-row">
+            <div class="setting-row-info">
+              <div class="sr-title">Новый заказ</div>
+              <div class="sr-sub">Уведомление когда поступает новый заказ</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="notif-new-order" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-info">
+              <div class="sr-title">Заказ готов</div>
+              <div class="sr-sub">Уведомление когда кухня отмечает заказ готовым</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="notif-order-ready" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-info">
+              <div class="sr-title">Отмена заказа</div>
+              <div class="sr-sub">Уведомление при отмене заказа</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="notif-cancel">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-card-header">Вызовы официанта</div>
+        <div class="setting-card-body">
+          <div class="setting-row">
+            <div class="setting-row-info">
+              <div class="sr-title">Вызов официанта</div>
+              <div class="sr-sub">Клиент нажал кнопку вызова</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="notif-waiter-call" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <div class="setting-row-info">
+              <div class="sr-title">Запрос счёта</div>
+              <div class="sr-sub">Клиент просит счёт</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="notif-bill" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-card-header">Звук уведомлений</div>
+        <div class="setting-card-body">
+          <div class="setting-row">
+            <div class="setting-row-info">
+              <div class="sr-title">Звук при новом заказе</div>
+              <div class="sr-sub">Воспроизводить звук при получении заказа</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="notif-sound" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveNotifications()"
+        style="width:100%;justify-content:center;padding:14px">
+        Сохранить уведомления
+      </button>
+    </div>
+
+    <!-- ── БЕЗОПАСНОСТЬ ── -->
+    <div class="settings-section" id="section-security">
+      <div class="section-title">Безопасность</div>
+      <div class="section-sub">Смена пароля и настройки доступа</div>
+
+      <div class="setting-card">
+        <div class="setting-card-header">Смена пароля</div>
+        <div class="setting-card-body">
+          <div class="form-group">
+            <label class="form-label">Текущий пароль</label>
+            <div class="pwd-input-wrap">
+              <input class="form-input" type="password" id="pwd-current" placeholder="••••••••">
+              <button class="pwd-eye" onclick="togglePwd('pwd-current')">👁</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Новый пароль</label>
+            <div class="pwd-input-wrap">
+              <input class="form-input" type="password" id="pwd-new" placeholder="Минимум 8 символов">
+              <button class="pwd-eye" onclick="togglePwd('pwd-new')">👁</button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Подтвердите пароль</label>
+            <div class="pwd-input-wrap">
+              <input class="form-input" type="password" id="pwd-confirm" placeholder="Повторите пароль">
+              <button class="pwd-eye" onclick="togglePwd('pwd-confirm')">👁</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-card-header">Сессия</div>
+        <div class="setting-card-body">
+          <div class="setting-row">
+            <div class="setting-row-info">
+              <div class="sr-title">Автовыход</div>
+              <div class="sr-sub">Выходить из системы через 8 часов неактивности</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="auto-logout" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div id="pwd-error" style="display:none;background:#CC000010;border:1px solid #CC000030;
+        color:#8B0000;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:14px"></div>
+      <div id="pwd-success" style="display:none;background:#22A06B10;border:1px solid #22A06B30;
+        color:#22A06B;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:14px"></div>
+
+      <button class="btn btn-primary" onclick="changePassword()"
+        style="width:100%;justify-content:center;padding:14px">
+        Изменить пароль
+      </button>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Fix Python True/False -> JS true/false
+if (typeof True  === 'undefined') var True  = true;
+if (typeof False === 'undefined') var False = false;
+if (typeof None  === 'undefined') var None  = null;
+
+// ── Navigation ────────────────────────────────────────────────────
+function showSection(name, el) {
+  document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+// ── Schedule ──────────────────────────────────────────────────────
+const dayNames      = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const savedSchedule = {{ restaurant.schedule|default:"[]"|safe|safe }};
+
+(function buildSchedule() {
+  const body = document.getElementById('schedule-body');
+  body.innerHTML = dayNames.map((day, i) => {
+    const s = savedSchedule[i] || { enabled: i < 6, open: '09:00', close: '22:00' };
+    return `<div class="schedule-row">
+      <span class="day-label">${day}</span>
+      <label class="toggle" style="width:38px;height:22px">
+        <input type="checkbox" class="day-enabled" data-i="${i}" ${s.enabled ? 'checked' : ''}>
+        <span class="toggle-slider"></span>
+      </label>
+      <input type="time" class="time-input day-open"  data-i="${i}" value="${s.open  || '09:00'}">
+      <span class="time-sep">—</span>
+      <input type="time" class="time-input day-close" data-i="${i}" value="${s.close || '22:00'}">
+    </div>`;
+  }).join('');
+})();
+
+// ── Status ────────────────────────────────────────────────────────
+function updateStatus() {
+  const isOpen = document.getElementById('is-open').checked;
+  document.getElementById('status-title').textContent =
+    isOpen ? 'Ресторан открыт' : 'Ресторан закрыт';
+  document.getElementById('status-sub').textContent =
+    isOpen ? 'Клиенты могут делать заказы' : 'Заказы не принимаются';
+}
+
+// ── Save General ──────────────────────────────────────────────────
+async function saveGeneral() {
+  const schedule = dayNames.map(function(_, i) {
+    var en = document.querySelector('.day-enabled[data-i="' + i + '"]');
+    var op = document.querySelector('.day-open[data-i="'    + i + '"]');
+    var cl = document.querySelector('.day-close[data-i="'  + i + '"]');
+    return {
+      enabled: en ? en.checked      : false,
+      open:    op ? op.value        : '09:00',
+      close:   cl ? cl.value        : '22:00',
+    };
+  });
+  const r = await fetch('/settings/', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+    body: JSON.stringify({
+      name:     document.getElementById('rest-name').value,
+      isOpen:   document.getElementById('is-open').checked,
+      schedule,
+    }),
+  });
+  const d = await r.json();
+  if (d.ok) showToast('✅ Настройки сохранены!', 'green');
+  else showToast('Ошибка сохранения', 'red');
+}
+
+// ── Payment Methods ───────────────────────────────────────────────
+// ИСПРАВЛЕНИЕ: Добавляем определение DEFAULT_METHODS, чтобы избежать ReferenceError
+const DEFAULT_METHODS = [
+    {id: 'Terminal', label: 'Terminal', icon: '💳', enabled: true},
+    {id: 'Humo',     label: 'Humo',     icon: '🏦', enabled: true},
+    {id: 'Click',    label: 'Click',    icon: '📱', enabled: true},
+    {id: 'Payme',    label: 'Payme',    icon: '💜', enabled: true},
+    {id: 'UZCARD',   label: 'UZCARD',   icon: '🟦', enabled: true},
+    {id: 'Naqd',     label: 'Naqd',     icon: '💵', enabled: true},
+];
+
+var paymentMethods = [];
+
+async function loadPaymentMethods() {
+  try {
+    const r = await fetch('/settings/payments/');
+    const d = await r.json();
+    // Если в базе пусто, подставляем дефолтные
+    paymentMethods = (d.methods && d.methods.length > 0) ? d.methods : DEFAULT_METHODS;
+    renderPaymentMethods();
+  } catch(e) { 
+    console.error(e);
+    paymentMethods = DEFAULT_METHODS;
+    renderPaymentMethods();
+  }
+}
+loadPaymentMethods();
+function addPaymentMethod() {
+  const input = document.getElementById('new-payment-name');
+  const name  = input.value.trim();
+  if (!name) return;
+  paymentMethods.push({ id: name, label: name, icon: '💰', enabled: true });
+  input.value = '';
+  renderPaymentMethods();
+}
+
+function removePaymentMethod(i) {
+  paymentMethods.splice(i, 1);
+  renderPaymentMethods();
+}
+
+async function savePayments() {
+  try {
+    const r = await fetch('/settings/payments/', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+      body:    JSON.stringify({ methods: paymentMethods }),
+    });
+    const d = await r.json();
+    if (d.ok) showToast('✅ Способы оплаты сохранены!', 'green');
+    else      showToast('Ошибка: ' + (d.error || 'неизвестная'), 'red');
+  } catch(e) {
+    showToast('Ошибка сети', 'red');
+  }
+}
+
+function renderPaymentMethods() {
+  const list = document.getElementById('payment-methods-list');
+  if (!list) return;
+
+  list.innerHTML = paymentMethods.map((m, i) => `
+    <div class="setting-row">
+      <div class="setting-row-info" style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">${m.icon || '💰'}</span>
+        <div>
+          <div class="sr-title">${m.label}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <label class="toggle">
+          <input type="checkbox" ${m.enabled ? 'checked' : ''}
+            onchange="paymentMethods[${i}].enabled=this.checked">
+          <span class="toggle-slider"></span>
+        </label>
+        ${i >= DEFAULT_METHODS.length ? `
+          <button onclick="removePaymentMethod(${i})"
+            style="background:none;border:none;cursor:pointer;color:#CC0000;font-size:18px;padding:0 5px">×</button>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+// Добавьте пропущенную функцию showToast в самый конец скрипта, чтобы уведомления работали:
+function showToast(msg, color) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.position = 'fixed';
+  t.style.bottom = '20px';
+  t.style.right = '20px';
+  t.style.padding = '12px 20px';
+  t.style.borderRadius = '8px';
+  t.style.color = '#fff';
+  t.style.backgroundColor = color === 'green' ? '#22A06B' : '#CC0000';
+  t.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+  t.style.zIndex = '9999';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Receipt Preview ───────────────────────────────────────────────
+function updatePreview() {
+  document.getElementById('prev-name').textContent =
+    document.getElementById('receipt-name').value || 'РЕСТОРАН';
+  document.getElementById('prev-subtitle').textContent =
+    document.getElementById('receipt-subtitle').value;
+  document.getElementById('prev-address').textContent =
+    document.getElementById('receipt-address').value;
+  document.getElementById('prev-phone').textContent =
+    document.getElementById('receipt-phone').value;
+  document.getElementById('prev-footer').textContent =
+    document.getElementById('receipt-footer').value;
+}
+
+['receipt-name','receipt-subtitle','receipt-address','receipt-phone','receipt-footer']
+  .forEach(id => document.getElementById(id)?.addEventListener('input', updatePreview));
+
+function saveReceipt() {
+  const settings = {
+    name:       document.getElementById('receipt-name').value,
+    subtitle:   document.getElementById('receipt-subtitle').value,
+    address:    document.getElementById('receipt-address').value,
+    phone:      document.getElementById('receipt-phone').value,
+    footer:     document.getElementById('receipt-footer').value,
+    showWaiter: document.getElementById('show-waiter').checked,
+    showCashier:document.getElementById('show-cashier').checked,
+    showQr:     document.getElementById('show-qr').checked,
+  };
+  localStorage.setItem('receiptSettings', JSON.stringify(settings));
+  showToast('✅ Настройки чека сохранены!', 'green');
+}
+
+// Загружаем сохранённые настройки чека
+(function loadReceiptSettings() {
+  const s = JSON.parse(localStorage.getItem('receiptSettings') || '{}');
+  if (s.subtitle)   document.getElementById('receipt-subtitle').value  = s.subtitle;
+  if (s.address)    document.getElementById('receipt-address').value   = s.address;
+  if (s.phone)      document.getElementById('receipt-phone').value     = s.phone;
+  if (s.footer)     document.getElementById('receipt-footer').value    = s.footer;
+  if (s.showQr !== undefined)
+    document.getElementById('show-qr').checked = s.showQr;
+  updatePreview();
+})();
+
+// ── Notifications ─────────────────────────────────────────────────
+function saveNotifications() {
+  const settings = {
+    newOrder:    document.getElementById('notif-new-order').checked,
+    orderReady:  document.getElementById('notif-order-ready').checked,
+    cancel:      document.getElementById('notif-cancel').checked,
+    waiterCall:  document.getElementById('notif-waiter-call').checked,
+    bill:        document.getElementById('notif-bill').checked,
+    sound:       document.getElementById('notif-sound').checked,
+  };
+  localStorage.setItem('notifSettings', JSON.stringify(settings));
+  showToast('✅ Уведомления сохранены!', 'green');
+}
+
+(function loadNotifSettings() {
+  const s = JSON.parse(localStorage.getItem('notifSettings') || '{}');
+  if (s.newOrder   !== undefined) document.getElementById('notif-new-order').checked   = s.newOrder;
+  if (s.orderReady !== undefined) document.getElementById('notif-order-ready').checked = s.orderReady;
+  if (s.cancel     !== undefined) document.getElementById('notif-cancel').checked      = s.cancel;
+  if (s.waiterCall !== undefined) document.getElementById('notif-waiter-call').checked = s.waiterCall;
+  if (s.bill       !== undefined) document.getElementById('notif-bill').checked        = s.bill;
+  if (s.sound      !== undefined) document.getElementById('notif-sound').checked       = s.sound;
+})();
+
+// ── Security ──────────────────────────────────────────────────────
+function togglePwd(id) {
+  const inp = document.getElementById(id);
+  inp.type  = inp.type === 'password' ? 'text' : 'password';
+}
+
+async function changePassword() {
+  const current = document.getElementById('pwd-current').value;
+  const newPwd  = document.getElementById('pwd-new').value;
+  const confirm = document.getElementById('pwd-confirm').value;
+  const errEl   = document.getElementById('pwd-error');
+  const okEl    = document.getElementById('pwd-success');
+
+  errEl.style.display = 'none';
+  okEl.style.display  = 'none';
+
+  if (!current || !newPwd || !confirm) {
+    errEl.textContent  = 'Заполните все поля';
+    errEl.style.display = 'block'; return;
+  }
+  if (newPwd.length < 8) {
+    errEl.textContent  = 'Пароль должен быть минимум 8 символов';
+    errEl.style.display = 'block'; return;
+  }
+  if (newPwd !== confirm) {
+    errEl.textContent  = 'Пароли не совпадают';
+    errEl.style.display = 'block'; return;
+  }
+
+  // Firebase Auth смена пароля через reauthentication
+  try {
+    const { getAuth, reauthenticateWithCredential,
+            EmailAuthProvider, updatePassword } = await import(
+      'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
+    const auth = getAuth();
+    const user = auth.currentUser;
+    const cred = EmailAuthProvider.credential(user.email, current);
+    await reauthenticateWithCredential(user, cred);
+    await updatePassword(user, newPwd);
+    okEl.textContent  = '✅ Пароль успешно изменён!';
+    okEl.style.display = 'block';
+    document.getElementById('pwd-current').value = '';
+    document.getElementById('pwd-new').value     = '';
+    document.getElementById('pwd-confirm').value = '';
+  } catch(e) {
+    errEl.textContent  = e.code === 'auth/wrong-password'
+      ? 'Неверный текущий пароль'
+      : 'Ошибка: ' + e.message;
+    errEl.style.display = 'block';
+  }
+}
+
+// ── Utils ─────────────────────────────────────────────────────────
+function getCookie(n) {
+  const v = document.cookie.match('(^|;)\\s*' + n + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+
+function showToast(msg, color) {
+  const t = document.createElement('div');
+  t.textContent   = msg;
+  t.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;
+    background:${color === 'green' ? '#22A06B' : '#CC0000'};color:#fff;
+    padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;
+    font-family:Inter,sans-serif;box-shadow:0 4px 20px rgba(0,0,0,.2)`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+</script>
+{% endblock %}

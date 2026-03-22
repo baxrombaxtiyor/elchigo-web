@@ -1,0 +1,473 @@
+{% extends 'base.html' %}
+{% block title %}Пользователи{% endblock %}
+{% block page_title %}Управление Пользователи{% endblock %}
+
+{% block extra_css %}
+<style>
+.staff-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;margin-bottom:24px}
+.staff-card{background:#fff;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px;border:1.5px solid var(--grey2);transition:border-color .15s}
+.staff-card:hover{border-color:#ccc}
+.staff-card.blocked{opacity:.6}
+.staff-head{display:flex;align-items:center;gap:12px}
+.staff-avatar{width:46px;height:46px;border-radius:12px;background:var(--dark-red);display:flex;align-items:center;justify-content:center;font-family:'Barlow',sans-serif;font-size:20px;font-weight:900;color:#fff;flex-shrink:0}
+.staff-avatar.manager{background:#3182CE}
+.staff-avatar.cook{background:#ED8936}
+.staff-avatar.cashier{background:#22A06B}
+.staff-avatar.blocked-av{background:#888}
+.staff-name{font-family:'Barlow',sans-serif;font-size:16px;font-weight:800}
+.staff-email{font-size:12px;color:var(--muted);margin-top:1px}
+.staff-meta{display:flex;flex-wrap:wrap;gap:8px}
+.meta-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.pill-role-waiter{background:#ED893620;color:#ED8936}
+.pill-role-manager{background:#3182CE20;color:#3182CE}
+.pill-role-cook{background:#F59E0B20;color:#F59E0B}
+.pill-role-cashier{background:#22A06B20;color:#22A06B}
+.pill-rest{background:#22A06B20;color:#22A06B}
+.pill-no-rest{background:#CC000015;color:#CC0000}
+.pill-blocked{background:#88888820;color:#888}
+.staff-phone{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.staff-actions{display:flex;gap:8px;margin-top:4px}
+.staff-actions .btn{flex:1;justify-content:center;font-size:12px;padding:7px 10px}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state svg{width:52px;height:52px;margin-bottom:12px;opacity:.3}
+.empty-state p{font-size:15px}
+.filter-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.filter-btn{padding:7px 16px;border-radius:20px;border:1.5px solid var(--grey2);background:#fff;font-size:13px;font-family:'Inter',sans-serif;font-weight:600;cursor:pointer;color:var(--muted);transition:all .15s}
+.filter-btn.active{background:var(--dark-red);color:#fff;border-color:var(--dark-red)}
+.search-input{padding:8px 14px;border:1.5px solid var(--grey2);border-radius:20px;font-size:13px;font-family:'Inter',sans-serif;outline:none;min-width:220px;transition:border-color .15s}
+.search-input:focus{border-color:var(--dark-red)}
+.staff-stats{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.staff-stat{background:#fff;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;border:1px solid var(--grey2)}
+.staff-stat-val{font-family:'Barlow',sans-serif;font-size:22px;font-weight:900}
+.staff-stat-lbl{font-size:11px;color:var(--muted);margin-top:1px}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats -->
+<div class="staff-stats">
+  <div class="staff-stat">
+    <div>
+      <div class="staff-stat-val" id="stat-total">—</div>
+      <div class="staff-stat-lbl">Всего сотрудников</div>
+    </div>
+  </div>
+  <div class="staff-stat">
+    <div>
+      <div class="staff-stat-val" id="stat-waiters" style="color:var(--dark-red)">—</div>
+      <div class="staff-stat-lbl">Официантов</div>
+    </div>
+  </div>
+  <div class="staff-stat">
+    <div>
+      <div class="staff-stat-val" id="stat-managers" style="color:#3182CE">—</div>
+      <div class="staff-stat-lbl">Менеджеров</div>
+    </div>
+  </div>
+  <div class="staff-stat">
+    <div>
+      <div class="staff-stat-val" id="stat-cooks" style="color:#F59E0B">—</div>
+      <div class="staff-stat-lbl">Поваров</div>
+    </div>
+  </div>
+  <div class="staff-stat">
+    <div>
+      <div class="staff-stat-val" id="stat-cashiers" style="color:#22A06B">—</div>
+      <div class="staff-stat-lbl">Кассиров</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filter-row">
+  <button class="filter-btn active" onclick="setFilter('all',this)">Все</button>
+  <button class="filter-btn" onclick="setFilter('waiter',this)">Официанты</button>
+  <button class="filter-btn" onclick="setFilter('manager',this)">Менеджеры</button>
+  <button class="filter-btn" onclick="setFilter('cook',this)">Повара</button>
+  <button class="filter-btn" onclick="setFilter('cashier',this)">Кассиры</button>
+  <button class="filter-btn" onclick="setFilter('blocked',this)">Заблокированные</button>
+  <input class="search-input" id="search-input"
+    placeholder="🔍  Поиск по имени или email..." oninput="renderStaff()">
+  <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openModal('create-modal')">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Добавить сотрудника
+  </button>
+  <button class="btn btn-outline btn-sm" onclick="loadStaff()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="23 4 23 10 17 10"/>
+      <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+    </svg>
+    Обновить
+  </button>
+</div>
+
+<!-- Grid -->
+<div class="staff-grid" id="staff-grid"></div>
+<div class="empty-state" id="empty-state" style="display:none">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+  </svg>
+  <p id="empty-text">Сотрудники не найдены</p>
+</div>
+
+<!-- Modal: Создать -->
+<div class="modal-bg" id="create-modal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title">➕ Добавить сотрудника</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Имя *</label>
+        <input class="form-input" id="c-firstname" placeholder="Алишер">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Фамилия</label>
+        <input class="form-input" id="c-lastname" placeholder="Каримов">
+      </div>
+    </div>
+    <div style="height:12px"></div>
+    <div class="form-group">
+      <label class="form-label">Email *</label>
+      <input class="form-input" id="c-email" type="email" placeholder="waiter@elchigo.uz">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Пароль * (минимум 6 символов)</label>
+      <div style="position:relative">
+        <input class="form-input" id="c-password" type="password"
+          placeholder="••••••••" style="padding-right:44px">
+        <button onclick="togglePass()" type="button"
+          style="position:absolute;right:12px;top:50%;transform:translateY(-50%);
+                 background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px">👁</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Телефон</label>
+      <input class="form-input" id="c-phone" placeholder="+998 90 123 45 67">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Роль</label>
+      <select class="form-input" id="c-role">
+        <option value="waiter">🍽 Официант</option>
+        <option value="manager">👔 Менеджер</option>
+        <option value="cook">👨‍🍳 Повар</option>
+        <option value="cashier">💰 Кассир</option>
+      </select>
+    </div>
+    <div id="c-error"
+      style="display:none;background:#CC000010;border:1px solid #CC000030;
+             color:#8B0000;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:12px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('create-modal');clearCreateForm()">Отмена</button>
+      <button class="btn btn-primary" id="c-submit-btn" onclick="createStaff()">Создать сотрудника</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Редактировать -->
+<div class="modal-bg" id="edit-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">Редактировать сотрудника</div>
+    <input type="hidden" id="edit-uid">
+    <div class="form-group">
+      <label class="form-label">Имя</label>
+      <input class="form-input" id="edit-name" placeholder="Имя сотрудника">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Телефон</label>
+      <input class="form-input" id="edit-phone" placeholder="+998 XX XXX XX XX">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Роль</label>
+      <select class="form-input" id="edit-role">
+        <option value="waiter">🍽 Официант</option>
+        <option value="manager">👔 Менеджер</option>
+        <option value="cook">👨‍🍳 Повар</option>
+        <option value="cashier">💰 Кассир</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Привязать к ресторану</label>
+      <select class="form-input" id="edit-restaurant">
+        <option value="">— Без ресторана —</option>
+        <option value="{{ restaurant_id }}">{{ restaurant_name }}</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('edit-modal')">Отмена</button>
+      <button class="btn btn-primary" onclick="saveStaff()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Удалить -->
+<div class="modal-bg" id="delete-modal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-title">Удалить сотрудника?</div>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:8px">
+      Аккаунт будет удалён из системы. Это действие нельзя отменить.
+    </p>
+    <p style="font-family:'Barlow',sans-serif;font-weight:800;font-size:16px" id="delete-name"></p>
+    <input type="hidden" id="delete-uid">
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('delete-modal')">Отмена</button>
+      <button class="btn btn-danger" onclick="confirmDelete()"
+        style="background:var(--dark-red);color:#fff">Удалить</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const RESTAURANT_ID   = '{{ restaurant_id }}';
+const RESTAURANT_NAME = '{{ restaurant_name }}';
+let allStaff = [];
+let currentFilter = 'all';
+
+async function loadStaff() {
+  try {
+    const r = await fetch('/staff/api/');
+    const d = await r.json();
+    allStaff = d.staff || [];
+    updateStats();
+    renderStaff();
+  } catch(e) { console.error(e) }
+}
+
+function updateStats() {
+  document.getElementById('stat-total').textContent    = allStaff.length;
+  document.getElementById('stat-waiters').textContent  = allStaff.filter(s=>s.role==='waiter').length;
+  document.getElementById('stat-managers').textContent = allStaff.filter(s=>s.role==='manager').length;
+  document.getElementById('stat-cooks').textContent    = allStaff.filter(s=>s.role==='cook').length;
+  document.getElementById('stat-cashiers').textContent = allStaff.filter(s=>s.role==='cashier').length;
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderStaff();
+}
+
+function renderStaff() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  let list = allStaff;
+  if (currentFilter === 'waiter')  list = list.filter(s=>s.role==='waiter');
+  if (currentFilter === 'manager') list = list.filter(s=>s.role==='manager');
+  if (currentFilter === 'cook')    list = list.filter(s=>s.role==='cook');
+  if (currentFilter === 'cashier') list = list.filter(s=>s.role==='cashier');
+  if (currentFilter === 'blocked') list = list.filter(s=>s.blocked);
+  if (q) list = list.filter(s=>
+    (s.name||'').toLowerCase().includes(q) ||
+    (s.email||'').toLowerCase().includes(q) ||
+    (s.phone||'').toLowerCase().includes(q)
+  );
+  const grid  = document.getElementById('staff-grid');
+  const empty = document.getElementById('empty-state');
+  if (list.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = '';
+    document.getElementById('empty-text').textContent =
+      q ? `По запросу «${q}» ничего не найдено` : 'Сотрудники не найдены';
+    return;
+  }
+  empty.style.display = 'none';
+  grid.innerHTML = list.map(s => staffCard(s)).join('');
+}
+
+function staffCard(s) {
+  const initials  = (s.name||s.email||'?')[0].toUpperCase();
+  const isCook    = s.role === 'cook';
+  const isCashier = s.role === 'cashier';
+  const isManager = s.role === 'manager';
+  const isBlocked = s.blocked;
+  const hasRest   = !!s.restaurantId;
+
+  const avatarCls = isBlocked ? 'blocked-av' : isCashier ? 'cashier' : isCook ? 'cook' : isManager ? 'manager' : '';
+
+  let rolePill = '';
+  if (isCashier)      rolePill = `<span class="meta-pill pill-role-cashier">💰 Кассир</span>`;
+  else if (isCook)    rolePill = `<span class="meta-pill pill-role-cook">👨‍🍳 Повар</span>`;
+  else if (isManager) rolePill = `<span class="meta-pill pill-role-manager">👔 Менеджер</span>`;
+  else                rolePill = `<span class="meta-pill pill-role-waiter">🍽 Официант</span>`;
+
+  const restPill  = hasRest
+    ? `<span class="meta-pill pill-rest">🏠 ${s.restaurantName||RESTAURANT_NAME}</span>`
+    : `<span class="meta-pill pill-no-rest">⚠️ Без ресторана</span>`;
+  const blockedPill = isBlocked
+    ? `<span class="meta-pill pill-blocked">🔒 Заблокирован</span>` : '';
+  const phoneLine = s.phone
+    ? `<div class="staff-phone">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 16.92v3a2 2 0 01-2.18 2A19.79 19.79 0 013.09 4.18 2 2 0 015.07 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L9.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+        </svg>${s.phone}</div>` : '';
+  const blockBtn = isBlocked
+    ? `<button class="btn btn-outline btn-sm" onclick="toggleBlock('${s.uid}',false)">🔓 Разблокировать</button>`
+    : `<button class="btn btn-outline btn-sm" onclick="toggleBlock('${s.uid}',true)">🔒 Заблокировать</button>`;
+
+  return `
+  <div class="staff-card ${isBlocked?'blocked':''}" id="card-${s.uid}">
+    <div class="staff-head">
+      <div class="staff-avatar ${avatarCls}">${initials}</div>
+      <div>
+        <div class="staff-name">${s.name||'—'}</div>
+        <div class="staff-email">${s.email}</div>
+      </div>
+    </div>
+    ${phoneLine}
+    <div class="staff-meta">${rolePill}${restPill}${blockedPill}</div>
+    <div class="staff-actions">
+      <button class="btn btn-outline btn-sm" onclick='openEdit(${JSON.stringify(s)})'>✏️ Изменить</button>
+      ${blockBtn}
+      <button class="btn btn-danger btn-sm"
+        onclick="openDelete('${s.uid}','${(s.name||s.email).replace(/'/g,"\\'")}')">🗑</button>
+    </div>
+  </div>`;
+}
+
+async function createStaff() {
+  const firstName = document.getElementById('c-firstname').value.trim();
+  const lastName  = document.getElementById('c-lastname').value.trim();
+  const email     = document.getElementById('c-email').value.trim();
+  const password  = document.getElementById('c-password').value;
+  const phone     = document.getElementById('c-phone').value.trim();
+  const role      = document.getElementById('c-role').value;
+  const btn       = document.getElementById('c-submit-btn');
+
+  if (!firstName)          { showCreateError('Введите имя'); return; }
+  if (!email)              { showCreateError('Введите email'); return; }
+  if (!password)           { showCreateError('Введите пароль'); return; }
+  if (password.length < 6) { showCreateError('Пароль минимум 6 символов'); return; }
+
+  btn.disabled    = true;
+  btn.textContent = 'Создание...';
+  document.getElementById('c-error').style.display = 'none';
+
+  try {
+    const r = await fetch('/staff/create/', {
+      method:  'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+      body: JSON.stringify({firstName, lastName, email, password, phone, role}),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      closeModal('create-modal');
+      clearCreateForm();
+      loadStaff();
+      showToast(`✅ Сотрудник ${firstName} ${lastName} создан!`);
+    } else {
+      showCreateError(d.error || 'Ошибка при создании');
+    }
+  } catch(e) {
+    showCreateError('Ошибка сети. Попробуйте ещё раз.');
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'Создать сотрудника';
+  }
+}
+
+function showCreateError(msg) {
+  const el = document.getElementById('c-error');
+  el.textContent   = msg;
+  el.style.display = 'block';
+}
+
+function clearCreateForm() {
+  ['c-firstname','c-lastname','c-email','c-password','c-phone']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('c-role').value          = 'waiter';
+  document.getElementById('c-error').style.display = 'none';
+}
+
+function togglePass() {
+  const inp = document.getElementById('c-password');
+  inp.type  = inp.type === 'password' ? 'text' : 'password';
+}
+
+function openEdit(s) {
+  document.getElementById('edit-uid').value        = s.uid;
+  document.getElementById('edit-name').value       = s.name||'';
+  document.getElementById('edit-phone').value      = s.phone||'';
+  document.getElementById('edit-role').value       = s.role||'waiter';
+  document.getElementById('edit-restaurant').value = s.restaurantId||'';
+  openModal('edit-modal');
+}
+
+async function saveStaff() {
+  const uid  = document.getElementById('edit-uid').value;
+  const body = {
+    name:         document.getElementById('edit-name').value.trim(),
+    phone:        document.getElementById('edit-phone').value.trim(),
+    role:         document.getElementById('edit-role').value,
+    restaurantId: document.getElementById('edit-restaurant').value,
+  };
+  const r = await fetch(`/staff/${uid}/update/`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify(body),
+  });
+  const d = await r.json();
+  if (d.ok) { closeModal('edit-modal'); loadStaff(); showToast('✅ Изменения сохранены'); }
+  else alert('Ошибка: '+(d.error||'неизвестная'));
+}
+
+async function toggleBlock(uid, block) {
+  const r = await fetch(`/staff/${uid}/block/`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify({blocked: block}),
+  });
+  const d = await r.json();
+  if (d.ok) loadStaff();
+  else alert('Ошибка: '+(d.error||'неизвестная'));
+}
+
+function openDelete(uid, name) {
+  document.getElementById('delete-uid').value        = uid;
+  document.getElementById('delete-name').textContent = name;
+  openModal('delete-modal');
+}
+
+async function confirmDelete() {
+  const uid = document.getElementById('delete-uid').value;
+  const r = await fetch(`/staff/${uid}/delete/`, {
+    method:'DELETE',
+    headers:{'X-CSRFToken':getCookie('csrftoken')},
+  });
+  const d = await r.json();
+  if (d.ok) { closeModal('delete-modal'); loadStaff(); showToast('🗑 Сотрудник удалён'); }
+  else alert('Ошибка: '+(d.error||'неизвестная'));
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open') }
+function closeModal(id) { document.getElementById(id).classList.remove('open') }
+function getCookie(n)   {
+  const v = document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent   = msg;
+  t.style.cssText = `
+    position:fixed;bottom:24px;right:24px;z-index:9999;
+    background:#111;color:#fff;padding:12px 20px;
+    border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;
+    box-shadow:0 4px 20px rgba(0,0,0,.3);
+  `;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+document.querySelectorAll('.modal-bg').forEach(bg =>
+  bg.addEventListener('click', e => { if(e.target===bg) bg.classList.remove('open') })
+);
+
+loadStaff();
+</script>
+{% endblock %}

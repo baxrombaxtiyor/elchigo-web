@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}QR-код{% endblock %}
+{% block page_title %}QR-код столика{% endblock %}
+{% block content %}
+<div style="max-width:400px;margin:0 auto;text-align:center">
+  <div style="background:#fff;border-radius:20px;padding:40px">
+    <div style="font-family:Barlow,sans-serif;font-size:24px;font-weight:900;margin-bottom:8px">Стол {{ table_id }}</div>
+    <div style="font-size:13px;color:#888;margin-bottom:24px">Отсканируйте для просмотра меню</div>
+    <div id="qr-code" style="margin:0 auto 24px"></div>
+    <div style="font-size:11px;color:#888;word-break:break-all;margin-bottom:20px">{{ qr_url }}</div>
+    <button class="btn btn-primary" onclick="window.print()" style="width:100%;justify-content:center">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Распечатать
+    </button>
+  </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+new QRCode(document.getElementById('qr-code'), {
+  text: '{{ qr_url }}',
+  width: 220, height: 220,
+  colorDark: '#111111', colorLight: '#ffffff',
+});
+</script>
+{% endblock %}

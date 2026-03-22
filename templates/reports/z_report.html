@@ -1,0 +1,380 @@
+{% extends 'base.html' %}
+{% block title %}Z-Отчёт{% endblock %}
+{% block page_title %}Z-Отчёт / Закрытие смены{% endblock %}
+
+{% block extra_css %}
+<style>
+.z-layout{display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start}
+@media(max-width:900px){.z-layout{grid-template-columns:1fr}}
+
+/* Дата */
+.z-date-bar{background:#fff;border-radius:14px;padding:16px 20px;border:1px solid var(--grey2);
+  display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.z-date-input{padding:9px 14px;border:1.5px solid var(--grey2);border-radius:10px;
+  font-size:14px;font-family:'Inter',sans-serif;outline:none}
+.z-date-input:focus{border-color:var(--dark-red)}
+
+/* Чек */
+.z-receipt{background:#fff;border-radius:14px;border:1px solid var(--grey2);
+  font-family:'Courier New',monospace;overflow:hidden;position:sticky;top:20px}
+.z-receipt-header{background:var(--black);color:#fff;padding:20px;text-align:center}
+.z-receipt-body{padding:20px}
+.z-line{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
+.z-line.bold{font-weight:700;font-size:14px}
+.z-line.big{font-weight:900;font-size:18px;font-family:'Barlow',sans-serif}
+.z-line.red{color:#CC0000}
+.z-line.green{color:#22A06B}
+.z-divider{border:none;border-top:1px dashed #ccc;margin:10px 0}
+.z-section-title{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;
+  margin:12px 0 6px;font-family:'Inter',sans-serif}
+
+/* Карточки */
+.z-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.z-card{background:#fff;border-radius:14px;padding:18px;border:1px solid var(--grey2)}
+.z-card.primary{background:var(--black);color:#fff}
+.z-card.green{border-top:3px solid #22A06B}
+.z-card.red{border-top:3px solid #CC0000}
+.z-card.blue{border-top:3px solid #3182CE}
+.z-card-val{font-family:'Barlow',sans-serif;font-size:26px;font-weight:900}
+.z-card-lbl{font-size:11px;color:var(--muted);margin-top:2px;font-weight:600;text-transform:uppercase}
+.z-card.primary .z-card-lbl{color:rgba(255,255,255,0.5)}
+.z-card.primary .z-card-val{color:#fff}
+
+/* Таблицы */
+.z-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px}
+.z-table th{text-align:left;padding:9px 14px;color:var(--muted);font-size:11px;font-weight:700;
+  border-bottom:2px solid var(--grey2);text-transform:uppercase;letter-spacing:.5px}
+.z-table td{padding:10px 14px;border-bottom:1px solid var(--grey2)}
+.z-table tr:last-child td{border-bottom:none}
+.z-table tr:hover td{background:var(--grey)}
+
+/* Закрытие смены */
+.z-close-btn{width:100%;padding:14px;background:var(--dark-red);color:#fff;border:none;
+  border-radius:12px;font-family:'Barlow',sans-serif;font-size:16px;font-weight:900;
+  cursor:pointer;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;gap:8px}
+.z-close-btn:hover{background:#6B0000}
+.z-close-btn:disabled{background:var(--grey2);cursor:not-allowed}
+
+.z-print-btn{width:100%;padding:11px;background:#fff;color:var(--black);border:1.5px solid var(--grey2);
+  border-radius:12px;font-family:'Barlow',sans-serif;font-size:14px;font-weight:700;
+  cursor:pointer;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px}
+.z-print-btn:hover{border-color:var(--black)}
+
+/* Метод оплаты */
+.method-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
+  border-radius:20px;font-size:11px;font-weight:700;background:var(--grey);color:var(--black)}
+
+/* Статус смены */
+.shift-status{padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;
+  display:inline-flex;align-items:center;gap:6px}
+.shift-open{background:#22A06B15;color:#22A06B;border:1.5px solid #22A06B30}
+.shift-closed{background:#CC000015;color:#CC0000;border:1.5px solid #CC000030}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Дата -->
+<div class="z-date-bar">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2">
+    <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+    <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+  <span style="font-weight:600;font-size:14px">Дата смены:</span>
+  <input type="date" class="z-date-input" id="shift-date">
+  <button class="btn btn-primary" onclick="loadZReport()">Загрузить</button>
+  <div style="margin-left:auto" id="shift-status-wrap"></div>
+</div>
+
+<div class="z-layout">
+  <!-- Левая часть — данные -->
+  <div>
+    <!-- Карточки -->
+    <div class="z-cards" id="z-cards">
+      <div class="z-card primary" style="grid-column:1/-1">
+        <div class="z-card-lbl">Выручка за смену</div>
+        <div class="z-card-val" id="z-revenue">—</div>
+      </div>
+      <div class="z-card green">
+        <div class="z-card-val" id="z-orders">—</div>
+        <div class="z-card-lbl">Заказов</div>
+      </div>
+      <div class="z-card blue">
+        <div class="z-card-val" id="z-avg">—</div>
+        <div class="z-card-lbl">Средний чек</div>
+      </div>
+      <div class="z-card">
+        <div class="z-card-val" id="z-delivered">—</div>
+        <div class="z-card-lbl">Выполнено</div>
+      </div>
+      <div class="z-card red">
+        <div class="z-card-val" id="z-cancelled" style="color:#CC0000">—</div>
+        <div class="z-card-lbl">Отменено</div>
+      </div>
+    </div>
+
+    <!-- По методам оплаты -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><span class="card-title">💳 По методам оплаты</span></div>
+      <div style="overflow-x:auto">
+        <table class="z-table">
+          <thead><tr>
+            <th>Метод</th><th>Транзакций</th><th>Сумма</th>
+          </tr></thead>
+          <tbody id="z-payments-body">
+            <tr><td colspan="3" style="text-align:center;color:var(--muted);padding:24px">Загрузка...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- По официантам -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><span class="card-title">👤 По официантам</span></div>
+      <div style="overflow-x:auto">
+        <table class="z-table">
+          <thead><tr>
+            <th>Официант</th><th>Заказов</th><th>Выручка</th><th>Отмен</th>
+          </tr></thead>
+          <tbody id="z-waiters-body">
+            <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">Загрузка...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Топ блюда -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">🍽 Топ блюда</span></div>
+      <div style="overflow-x:auto">
+        <table class="z-table">
+          <thead><tr>
+            <th>#</th><th>Блюдо</th><th>Кол-во</th><th>Выручка</th>
+          </tr></thead>
+          <tbody id="z-dishes-body">
+            <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">Загрузка...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Правая часть — чек и кнопки -->
+  <div>
+    <div class="z-receipt">
+      <div class="z-receipt-header">
+        <div style="font-family:'Barlow',sans-serif;font-size:20px;font-weight:900;letter-spacing:2px">
+          {{ restaurant_name|upper }}
+        </div>
+        <div style="font-size:11px;opacity:.6;margin-top:4px;letter-spacing:2px">Z-ОТЧЁТ / ЗАКРЫТИЕ СМЕНЫ</div>
+      </div>
+      <div class="z-receipt-body" id="z-receipt-body">
+        <div style="text-align:center;color:var(--muted);padding:20px;font-family:'Inter',sans-serif;font-size:13px">
+          Выберите дату и нажмите "Загрузить"
+        </div>
+      </div>
+    </div>
+
+    <!-- Кнопки -->
+    <div style="margin-top:16px">
+      <button class="z-close-btn" id="close-shift-btn" onclick="closeShift()" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/>
+          <line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>
+        </svg>
+        Закрыть смену
+      </button>
+      <button class="z-print-btn" onclick="printZReport()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+          <rect x="6" y="14" width="12" height="8"/>
+        </svg>
+        Распечатать чек
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let zData = null;
+let shiftDate = '';
+
+function fmt(n) {
+  return new Intl.NumberFormat('ru-RU').format(Math.round(n));
+}
+
+async function loadZReport() {
+  shiftDate = document.getElementById('shift-date').value;
+  if (!shiftDate) return;
+
+  try {
+    const r = await fetch(`/reports/api/?period=custom&from=${shiftDate}&to=${shiftDate}`);
+    zData = await r.json();
+
+    // Также загружаем платежи по методам
+    const r2 = await fetch(`/finance/api/?period=custom&from=${shiftDate}&to=${shiftDate}`);
+    const fin = await r2.json();
+
+    renderZReport(zData, fin);
+    document.getElementById('close-shift-btn').disabled = false;
+  } catch(e) { console.error(e); }
+}
+
+function renderZReport(d, fin) {
+  const s = d.summary;
+
+  // Карточки
+  document.getElementById('z-revenue').textContent   = fmt(s.total_revenue) + ' сум';
+  document.getElementById('z-orders').textContent    = s.total_orders;
+  document.getElementById('z-avg').textContent       = fmt(s.avg_order) + ' сум';
+  document.getElementById('z-delivered').textContent = s.delivered;
+  document.getElementById('z-cancelled').textContent = s.cancelled;
+
+  // Методы оплаты из payments
+  const methodMap = {};
+  for (const t of (fin.transactions || [])) {
+    if (t.type !== 'payment') continue;
+    const m = t.method || 'Другое';
+    if (!methodMap[m]) methodMap[m] = {count: 0, total: 0};
+    methodMap[m].count++;
+    methodMap[m].total += t.amount;
+  }
+  const payBody = document.getElementById('z-payments-body');
+  const methods = Object.entries(methodMap).sort((a,b) => b[1].total - a[1].total);
+  if (!methods.length) {
+    payBody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px">Нет данных</td></tr>';
+  } else {
+    payBody.innerHTML = methods.map(([m, v]) => `
+      <tr>
+        <td><span class="method-badge">${m}</span></td>
+        <td style="font-weight:700">${v.count}</td>
+        <td style="font-weight:800;color:var(--dark-red)">${fmt(v.total)} сум</td>
+      </tr>`).join('');
+  }
+
+  // Официанты
+  const wBody = document.getElementById('z-waiters-body');
+  if (!d.waiters.length) {
+    wBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Нет данных</td></tr>';
+  } else {
+    wBody.innerHTML = d.waiters.map(w => `
+      <tr>
+        <td style="font-weight:600">${w.name || '—'}</td>
+        <td>${w.orders}</td>
+        <td style="font-weight:700;color:var(--dark-red)">${fmt(w.revenue)} сум</td>
+        <td style="color:#CC0000">${w.cancelled}</td>
+      </tr>`).join('');
+  }
+
+  // Блюда
+  const dBody = document.getElementById('z-dishes-body');
+  if (!d.top_dishes.length) {
+    dBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Нет данных</td></tr>';
+  } else {
+    dBody.innerHTML = d.top_dishes.slice(0,10).map((dish, i) => `
+      <tr>
+        <td style="color:var(--muted);font-weight:700">${i+1}</td>
+        <td style="font-weight:600">${dish.name}</td>
+        <td>${dish.count} шт</td>
+        <td style="font-weight:700;color:var(--dark-red)">${fmt(dish.revenue)} сум</td>
+      </tr>`).join('');
+  }
+
+  // Чек
+  renderReceipt(s, methods, d.waiters, shiftDate);
+}
+
+function renderReceipt(s, methods, waiters, date) {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+
+  let methodLines = methods.map(([m, v]) =>
+    `<div class="z-line"><span>${m}</span><span>${fmt(v.total)} сум</span></div>`
+  ).join('');
+
+  let waiterLines = waiters.map(w =>
+    `<div class="z-line"><span>${w.name||'—'}</span><span>${fmt(w.revenue)} сум</span></div>`
+  ).join('');
+
+  document.getElementById('z-receipt-body').innerHTML = `
+    <div class="z-section-title">Смена</div>
+    <div class="z-line"><span>Дата</span><span>${date}</span></div>
+    <div class="z-line"><span>Время закрытия</span><span>${timeStr}</span></div>
+    <hr class="z-divider">
+
+    <div class="z-section-title">Итоги</div>
+    <div class="z-line"><span>Заказов всего</span><span>${s.total_orders}</span></div>
+    <div class="z-line green"><span>Выполнено</span><span>${s.delivered}</span></div>
+    <div class="z-line red"><span>Отменено</span><span>${s.cancelled}</span></div>
+    <div class="z-line"><span>Средний чек</span><span>${fmt(s.avg_order)} сум</span></div>
+    <hr class="z-divider">
+
+    <div class="z-section-title">По методам оплаты</div>
+    ${methodLines || '<div class="z-line" style="color:#888"><span>Нет данных</span></div>'}
+    <hr class="z-divider">
+
+    <div class="z-section-title">По официантам</div>
+    ${waiterLines || '<div class="z-line" style="color:#888"><span>Нет данных</span></div>'}
+    <hr class="z-divider">
+
+    <div class="z-line big"><span>ИТОГО</span><span style="color:var(--dark-red)">${fmt(s.total_revenue)}</span></div>
+    <div class="z-line" style="font-size:11px;color:#888;justify-content:center;margin-top:8px">сум</div>
+    <hr class="z-divider">
+    <div style="text-align:center;font-size:11px;color:#888;margin-top:8px;font-family:'Inter',sans-serif">
+      ELCHIGO • Смена закрыта<br>${date} ${timeStr}
+    </div>
+  `;
+}
+
+async function closeShift() {
+  if (!shiftDate || !zData) return;
+  if (!confirm(`Закрыть смену за ${shiftDate}? Это действие будет сохранено в историю.`)) return;
+
+  try {
+    const r = await fetch('/reports/z-close/', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')},
+      body: JSON.stringify({
+        date:    shiftDate,
+        revenue: zData.summary.total_revenue,
+        orders:  zData.summary.total_orders,
+      }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ Смена закрыта!', 'green');
+      document.getElementById('shift-status-wrap').innerHTML =
+        '<span class="shift-status shift-closed">🔒 Смена закрыта</span>';
+      document.getElementById('close-shift-btn').disabled = true;
+    }
+  } catch(e) { showToast('Ошибка', 'red'); }
+}
+
+function printZReport() {
+  if (!zData) return;
+  window.print();
+}
+
+function showToast(msg, color) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;
+    background:${color==='green'?'#22A06B':'#CC0000'};color:#fff;
+    padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;
+    font-family:Inter,sans-serif;box-shadow:0 4px 20px rgba(0,0,0,.2)`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function getCookie(n) {
+  const v = document.cookie.match('(^|;)\\s*' + n + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+
+// Сегодня по умолчанию
+document.getElementById('shift-date').value = new Date().toISOString().slice(0,10);
+loadZReport();
+</script>
+{% endblock %}
