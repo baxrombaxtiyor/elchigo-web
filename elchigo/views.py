@@ -47,10 +47,14 @@ def login_view(request):
     if request.session.get('uid'):
         return redirect('dashboard')
     if request.method == 'POST':
-        id_token = request.POST.get('idToken')
+        id_token = request.POST.get('idToken', '')
+        print(f'[LOGIN] idToken length: {len(id_token)}')
+        if not id_token:
+            return JsonResponse({'error': 'idToken не получен'}, status=401)
         try:
-            decoded = fb_auth.verify_id_token(id_token)
+            decoded = fb_auth.verify_id_token(id_token, check_revoked=False)
             uid = decoded['uid']
+            print(f'[LOGIN] uid: {uid}')
             db = get_db()
             user_doc = db.collection('users').document(uid).get()
             if not user_doc.exists:
@@ -66,6 +70,7 @@ def login_view(request):
                     request.session['restaurant_name'] = rest_doc.to_dict().get('name', '')
             return JsonResponse({'ok': True})
         except Exception as e:
+            print(f'[LOGIN ERROR] {type(e).__name__}: {e}')
             return JsonResponse({'error': str(e)}, status=401)
     return render(request, 'auth/login.html')
 
@@ -82,7 +87,7 @@ def register_view(request):
         id_token        = request.POST.get('idToken')
         restaurant_name = request.POST.get('restaurantName', '').strip()
         try:
-            decoded = fb_auth.verify_id_token(id_token)
+            decoded = fb_auth.verify_id_token(id_token, check_revoked=False)
             uid = decoded['uid']; email = decoded.get('email', '')
             db = get_db()
             import uuid
@@ -271,12 +276,9 @@ def add_table(request):
     if request.method != 'POST': return JsonResponse({'error': 'Method not allowed'}, status=405)
     data = json.loads(request.body); db = get_db(); rid = get_restaurant_id(request)
     db.collection('restaurants').document(rid).collection('tables').add({
-        'number':   data.get('number', ''),
-        'seats':    int(data.get('seats', 4)),
-        'status':   'free',
-        'waiterId':   data.get('waiterId', ''),
-        'waiterName': data.get('waiterName', ''),
-        'category':   data.get('category', ''),
+        'number': data.get('number', ''), 'seats': int(data.get('seats', 4)), 'status': 'free',
+        'waiterId': data.get('waiterId', ''), 'waiterName': data.get('waiterName', ''),
+        'category': data.get('category', ''),
     })
     return JsonResponse({'ok': True})
 
@@ -324,62 +326,42 @@ def stats_api(request):
     else: start = now - timedelta(days=7)
     daily = {}; dish_count = {}; total_revenue = 0
     for doc in db.collection('orders').where('restaurantId', '==', rid).where('status', '==', 'delivered').stream():
-        o = doc.to_dict()
-        dt = _parse_dt(o.get('createdAt'))
+        o = doc.to_dict(); dt = _parse_dt(o.get('createdAt'))
         if not dt: continue
         dt_local = dt + timedelta(hours=5)
         if dt_local < start: continue
-        day_key = dt_local.strftime('%d.%m')
-        price = o.get('totalPrice', 0)
-        daily[day_key] = daily.get(day_key, 0) + price
-        total_revenue += price
+        day_key = dt_local.strftime('%d.%m'); price = o.get('totalPrice', 0)
+        daily[day_key] = daily.get(day_key, 0) + price; total_revenue += price
         for item in o.get('items', []):
             name = item.get('dishName', ''); qty = item.get('quantity', 1)
             dish_count[name] = dish_count.get(name, 0) + qty
     top_dishes = sorted(dish_count.items(), key=lambda x: x[1], reverse=True)[:5]
-
-    # Статистика официантов
     waiter_stats = {}
     for doc in db.collection('orders').where('restaurantId', '==', rid).where('status', '==', 'delivered').stream():
-        o = doc.to_dict()
-        dt = _parse_dt(o.get('createdAt'))
-        if not dt: continue
-        if (dt + timedelta(hours=5)) < start: continue
+        o = doc.to_dict(); dt = _parse_dt(o.get('createdAt'))
+        if not dt or (dt + timedelta(hours=5)) < start: continue
         wid = o.get('waiterId', ''); wname = o.get('waiterName', '') or wid
         if not wid: continue
-        if wid not in waiter_stats:
-            waiter_stats[wid] = {'name': wname, 'revenue': 0, 'orders': 0}
-        waiter_stats[wid]['revenue'] += o.get('totalPrice', 0)
-        waiter_stats[wid]['orders']  += 1
+        if wid not in waiter_stats: waiter_stats[wid] = {'name': wname, 'revenue': 0, 'orders': 0}
+        waiter_stats[wid]['revenue'] += o.get('totalPrice', 0); waiter_stats[wid]['orders'] += 1
     waiters_list = sorted(waiter_stats.values(), key=lambda x: x['revenue'], reverse=True)[:8]
-
-    # Категории блюд
     cat_revenue = {}
     for doc in db.collection('orders').where('restaurantId', '==', rid).where('status', '==', 'delivered').stream():
-        o = doc.to_dict()
-        dt = _parse_dt(o.get('createdAt'))
-        if not dt: continue
-        if (dt + timedelta(hours=5)) < start: continue
+        o = doc.to_dict(); dt = _parse_dt(o.get('createdAt'))
+        if not dt or (dt + timedelta(hours=5)) < start: continue
         for item in o.get('items', []):
             cat = item.get('catName', 'Другое') or 'Другое'
             cat_revenue[cat] = cat_revenue.get(cat, 0) + float(item.get('total', 0))
     cats_list = sorted(cat_revenue.items(), key=lambda x: x[1], reverse=True)[:8]
-
-    # Топ блюда с картинками
     dish_images = {}
     for cat_doc in db.collection('restaurants').document(rid).collection('categories').stream():
         for dish_doc in db.collection('restaurants').document(rid).collection('categories').document(cat_doc.id).collection('dishes').stream():
-            d = dish_doc.to_dict()
-            dish_images[d.get('name', '')] = d.get('imageUrl', '')
-
-    top_dishes_data = [{'name': k, 'count': v, 'image': dish_images.get(k, '')} for k, v in top_dishes]
-
+            d = dish_doc.to_dict(); dish_images[d.get('name', '')] = d.get('imageUrl', '')
     return JsonResponse({
-        'daily':       daily,
-        'top_dishes':  top_dishes_data,
-        'total_revenue': total_revenue,
-        'waiters':     waiters_list,
-        'categories':  [{'name': k, 'revenue': v} for k, v in cats_list],
+        'daily': daily,
+        'top_dishes': [{'name': k, 'count': v, 'image': dish_images.get(k, '')} for k, v in top_dishes],
+        'total_revenue': total_revenue, 'waiters': waiters_list,
+        'categories': [{'name': k, 'revenue': v} for k, v in cats_list],
     })
 
 
@@ -404,22 +386,18 @@ def reports_api(request):
             end   = datetime.strptime(date_to, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
         except: start = now - timedelta(days=7); end = now
     else: start = now - timedelta(days=7); end = now
-
     all_orders = []
     for doc in db.collection('orders').where('restaurantId', '==', rid).stream():
         o = doc.to_dict(); o['id'] = doc.id
         dt = _parse_dt(o.get('createdAt'))
         if dt and start <= dt <= end:
             o['_dt'] = dt; all_orders.append(o)
-
     delivered = [o for o in all_orders if o.get('status') == 'delivered']
     cancelled = [o for o in all_orders if o.get('status') == 'cancelled']
     active    = [o for o in all_orders if o.get('status') != 'cancelled']
-
     daily = {}
     for o in active:
         day = o['_dt'].strftime('%d.%m'); daily[day] = daily.get(day, 0) + o.get('totalPrice', 0)
-
     dish_count = {}; dish_revenue = {}
     for o in active:
         for item in o.get('items', []):
@@ -428,7 +406,6 @@ def reports_api(request):
             dish_count[name] = dish_count.get(name, 0) + qty
             dish_revenue[name] = dish_revenue.get(name, 0) + price * qty
     top_dishes = sorted(dish_count.items(), key=lambda x: x[1], reverse=True)[:10]
-
     waiter_stats = {}
     for o in all_orders:
         wid = o.get('waiterId', ''); wname = o.get('waiterName', '') or wid
@@ -440,7 +417,6 @@ def reports_api(request):
         if o.get('status') == 'delivered': waiter_stats[wid]['delivered'] += 1
         elif o.get('status') == 'cancelled': waiter_stats[wid]['cancelled'] += 1
     waiters_list = sorted(waiter_stats.values(), key=lambda x: x['revenue'], reverse=True)
-
     table_stats = {}
     for o in active:
         tnum = str(o.get('tableNumber', ''))
@@ -449,10 +425,8 @@ def reports_api(request):
         table_stats[tnum]['orders'] += 1; table_stats[tnum]['revenue'] += o.get('totalPrice', 0)
     tables_list = [{'table': k, 'orders': v['orders'], 'revenue': v['revenue']}
                    for k, v in sorted(table_stats.items(), key=lambda x: x[1]['revenue'], reverse=True)]
-
     total_revenue = sum(o.get('totalPrice', 0) for o in active)
     avg_order = total_revenue / len(active) if active else 0
-
     return JsonResponse({
         'summary': {'total_orders': len(all_orders), 'delivered': len(delivered),
                     'cancelled': len(cancelled), 'total_revenue': total_revenue, 'avg_order': avg_order},
@@ -466,24 +440,19 @@ def reports_api(request):
 
 @login_required
 def restaurant_settings(request):
-    db  = get_db()
-    rid = get_restaurant_id(request)
-    rest_doc  = db.collection('restaurants').document(rid).get()
+    db = get_db(); rid = get_restaurant_id(request)
+    rest_doc = db.collection('restaurants').document(rid).get()
     rest_data = rest_doc.to_dict() if rest_doc.exists else {}
-
     if request.method == 'POST':
         data = json.loads(request.body)
         db.collection('restaurants').document(rid).update({
-            'name':     data.get('name', ''),
-            'isOpen':   data.get('isOpen', True),
+            'name': data.get('name', ''), 'isOpen': data.get('isOpen', True),
             'schedule': data.get('schedule', []),
         })
         request.session['restaurant_name'] = data.get('name', '')
         return JsonResponse({'ok': True})
-
     return render(request, 'settings/index.html', {
-        'restaurant':      rest_data,
-        'restaurant_name': request.session.get('restaurant_name', ''),
+        'restaurant': rest_data, 'restaurant_name': request.session.get('restaurant_name', ''),
     })
 
 
@@ -491,13 +460,10 @@ def restaurant_settings(request):
 
 @login_required
 def payment_methods_api(request):
-    db  = get_db()
-    rid = get_restaurant_id(request)
-
+    db = get_db(); rid = get_restaurant_id(request)
     if request.method == 'GET':
         rest_doc = db.collection('restaurants').document(rid).get()
-        if not rest_doc.exists:
-            return JsonResponse({'methods': []})
+        if not rest_doc.exists: return JsonResponse({'methods': []})
         methods = rest_doc.to_dict().get('paymentMethods', [
             {'id': 'Terminal', 'label': 'Terminal', 'icon': '💳', 'enabled': True},
             {'id': 'Humo',     'label': 'Humo',     'icon': '🏦', 'enabled': True},
@@ -507,13 +473,10 @@ def payment_methods_api(request):
             {'id': 'Naqd',     'label': 'Naqd',     'icon': '💵', 'enabled': True},
         ])
         return JsonResponse({'methods': methods})
-
     if request.method == 'POST':
-        data    = json.loads(request.body)
-        methods = data.get('methods', [])
-        db.collection('restaurants').document(rid).update({'paymentMethods': methods})
+        data = json.loads(request.body)
+        db.collection('restaurants').document(rid).update({'paymentMethods': data.get('methods', [])})
         return JsonResponse({'ok': True})
-
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
@@ -618,183 +581,110 @@ def finance(request):
         'restaurant_name': request.session.get('restaurant_name', ''),
     })
 
-
 @login_required
 def finance_api(request):
-    db     = get_db()
-    rid    = get_restaurant_id(request)
-    period = request.GET.get('period', 'today')
-    now    = datetime.now()
-
-    if period == 'today':
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif period == 'week':
-        start = now - timedelta(days=7)
-    elif period == 'month':
-        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:
-        start = datetime(2000, 1, 1)
-
-    transactions = []
-    daily = {}
-
-    # Доходы — из payments
+    db = get_db(); rid = get_restaurant_id(request)
+    period = request.GET.get('period', 'today'); now = datetime.now()
+    if period == 'today': start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == 'week': start = now - timedelta(days=7)
+    elif period == 'month': start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else: start = datetime(2000, 1, 1)
+    transactions = []; daily = {}
     for doc in db.collection('payments').where('restaurantId', '==', rid).stream():
-        p  = doc.to_dict()
-        dt = _parse_dt(p.get('createdAt'))
+        p = doc.to_dict(); dt = _parse_dt(p.get('createdAt'))
         if not dt or dt < start: continue
-        dt_local = dt + timedelta(hours=5)
-        day      = dt_local.strftime('%d.%m')
-        amount   = p.get('total', 0)
-        transactions.append({
-            'id':          doc.id,
-            'type':        'payment',
-            'description': f"Стол {p.get('tableNumber', '?')}",
-            'category':    'Выручка',
-            'method':      p.get('paymentMethod', ''),
-            'amount':      amount,
-            'date':        dt_local.strftime('%d.%m.%Y %H:%M'),
-        })
-        if day not in daily:
-            daily[day] = {'income': 0, 'expense': 0}
+        dt_local = dt + timedelta(hours=5); day = dt_local.strftime('%d.%m'); amount = p.get('total', 0)
+        transactions.append({'id': doc.id, 'type': 'payment',
+            'description': f"Стол {p.get('tableNumber', '?')}", 'category': 'Выручка',
+            'method': p.get('paymentMethod', ''), 'amount': amount,
+            'date': dt_local.strftime('%d.%m.%Y %H:%M')})
+        if day not in daily: daily[day] = {'income': 0, 'expense': 0}
         daily[day]['income'] += amount
-
-    # Расходы — из expenses коллекции
     for doc in db.collection('expenses').where('restaurantId', '==', rid).stream():
-        e  = doc.to_dict()
-        dt = _parse_dt(e.get('createdAt'))
+        e = doc.to_dict(); dt = _parse_dt(e.get('createdAt'))
         if not dt or dt < start: continue
-        dt_local = dt + timedelta(hours=5)
-        day      = dt_local.strftime('%d.%m')
-        amount   = e.get('amount', 0)
-        transactions.append({
-            'id':          doc.id,
-            'type':        'expense',
-            'description': e.get('description', ''),
-            'category':    e.get('category', ''),
-            'method':      '—',
-            'amount':      amount,
-            'date':        dt_local.strftime('%d.%m.%Y %H:%M'),
-        })
-        if day not in daily:
-            daily[day] = {'income': 0, 'expense': 0}
+        dt_local = dt + timedelta(hours=5); day = dt_local.strftime('%d.%m'); amount = e.get('amount', 0)
+        transactions.append({'id': doc.id, 'type': 'expense',
+            'description': e.get('description', ''), 'category': e.get('category', ''),
+            'method': '—', 'amount': amount, 'date': dt_local.strftime('%d.%m.%Y %H:%M')})
+        if day not in daily: daily[day] = {'income': 0, 'expense': 0}
         daily[day]['expense'] += amount
-
-    # Sort by date desc
     transactions.sort(key=lambda x: x['date'], reverse=True)
-
-    total_income  = sum(t['amount'] for t in transactions if t['type'] == 'payment')
-    total_expense = sum(t['amount'] for t in transactions if t['type'] == 'expense')
-    income_count  = sum(1 for t in transactions if t['type'] == 'payment')
-    expense_count = sum(1 for t in transactions if t['type'] == 'expense')
-
     return JsonResponse({
-        'transactions':  transactions,
-        'total_income':  total_income,
-        'total_expense': total_expense,
-        'income_count':  income_count,
-        'expense_count': expense_count,
-        'daily':         daily,
+        'transactions': transactions,
+        'total_income': sum(t['amount'] for t in transactions if t['type'] == 'payment'),
+        'total_expense': sum(t['amount'] for t in transactions if t['type'] == 'expense'),
+        'income_count': sum(1 for t in transactions if t['type'] == 'payment'),
+        'expense_count': sum(1 for t in transactions if t['type'] == 'expense'),
+        'daily': daily,
     })
-
 
 @login_required
 @csrf_exempt
 def finance_expenses(request):
-    db  = get_db()
-    rid = get_restaurant_id(request)
-
+    db = get_db(); rid = get_restaurant_id(request)
     if request.method == 'GET':
         expenses = []
         for doc in db.collection('expenses').where('restaurantId', '==', rid)\
                 .order_by('createdAt', direction='DESCENDING').limit(50).stream():
-            e = doc.to_dict()
-            dt = _parse_dt(e.get('createdAt'))
+            e = doc.to_dict(); dt = _parse_dt(e.get('createdAt'))
             dt_local = (dt + timedelta(hours=5)).strftime('%d.%m.%Y') if dt else ''
-            expenses.append({
-                'id':          doc.id,
-                'description': e.get('description', ''),
-                'amount':      e.get('amount', 0),
-                'category':    e.get('category', ''),
-                'date':        dt_local,
-                'comment':     e.get('comment', ''),
-            })
+            expenses.append({'id': doc.id, 'description': e.get('description', ''),
+                'amount': e.get('amount', 0), 'category': e.get('category', ''),
+                'date': dt_local, 'comment': e.get('comment', '')})
         return JsonResponse({'expenses': expenses})
-
     if request.method == 'POST':
         data = json.loads(request.body)
-        desc   = data.get('description', '').strip()
-        amount = float(data.get('amount', 0))
+        desc = data.get('description', '').strip(); amount = float(data.get('amount', 0))
         if not desc or amount <= 0:
             return JsonResponse({'error': 'Описание и сумма обязательны'}, status=400)
         db.collection('expenses').add({
-            'restaurantId': rid,
-            'description':  desc,
-            'amount':       amount,
-            'category':     data.get('category', ''),
-            'comment':      data.get('comment', ''),
-            'createdAt':    firestore.SERVER_TIMESTAMP,
+            'restaurantId': rid, 'description': desc, 'amount': amount,
+            'category': data.get('category', ''), 'comment': data.get('comment', ''),
+            'createdAt': firestore.SERVER_TIMESTAMP,
         })
         return JsonResponse({'ok': True})
-
     return JsonResponse({'error': 'Method not allowed'}, status=405)
-
 
 @login_required
 @csrf_exempt
 def finance_expense_delete(request, expense_id):
-    if request.method != 'DELETE':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    db = get_db()
-    db.collection('expenses').document(expense_id).delete()
+    if request.method != 'DELETE': return JsonResponse({'error': 'Method not allowed'}, status=405)
+    get_db().collection('expenses').document(expense_id).delete()
     return JsonResponse({'ok': True})
-
 
 @login_required
 def finance_categories(request):
-    db  = get_db()
-    rid = get_restaurant_id(request)
-
+    db = get_db(); rid = get_restaurant_id(request)
     if request.method == 'GET':
-        doc  = db.collection('restaurants').document(rid).get()
+        doc = db.collection('restaurants').document(rid).get()
         data = doc.to_dict() if doc.exists else {}
         return JsonResponse({
             'expense': data.get('expenseCategories', ['Продукты', 'Аренда', 'Зарплата', 'Коммунальные', 'Прочее']),
             'income':  data.get('incomeCategories',  ['Выручка', 'Доставка', 'Банкет']),
         })
-
     if request.method == 'POST':
-        data  = json.loads(request.body)
-        ctype = data.get('type')
-        name  = data.get('name', '').strip()
-        if not name:
-            return JsonResponse({'error': 'Название обязательно'}, status=400)
-        doc      = db.collection('restaurants').document(rid).get()
-        rest     = doc.to_dict() if doc.exists else {}
-        field    = 'expenseCategories' if ctype == 'expense' else 'incomeCategories'
-        cats     = rest.get(field, [])
-        if name not in cats:
-            cats.append(name)
+        data = json.loads(request.body); ctype = data.get('type'); name = data.get('name', '').strip()
+        if not name: return JsonResponse({'error': 'Название обязательно'}, status=400)
+        doc = db.collection('restaurants').document(rid).get()
+        rest = doc.to_dict() if doc.exists else {}
+        field = 'expenseCategories' if ctype == 'expense' else 'incomeCategories'
+        cats = rest.get(field, [])
+        if name not in cats: cats.append(name)
         db.collection('restaurants').document(rid).update({field: cats})
         return JsonResponse({'ok': True})
-
     return JsonResponse({'error': 'Method not allowed'}, status=405)
-
 
 @login_required
 @csrf_exempt
 def finance_category_delete(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    data  = json.loads(request.body)
-    ctype = data.get('type')
-    name  = data.get('name', '')
-    db    = get_db()
-    rid   = get_restaurant_id(request)
-    doc   = db.collection('restaurants').document(rid).get()
-    rest  = doc.to_dict() if doc.exists else {}
+    if request.method != 'POST': return JsonResponse({'error': 'Method not allowed'}, status=405)
+    data = json.loads(request.body); ctype = data.get('type'); name = data.get('name', '')
+    db = get_db(); rid = get_restaurant_id(request)
+    doc = db.collection('restaurants').document(rid).get()
+    rest = doc.to_dict() if doc.exists else {}
     field = 'expenseCategories' if ctype == 'expense' else 'incomeCategories'
-    cats  = [c for c in rest.get(field, []) if c != name]
+    cats = [c for c in rest.get(field, []) if c != name]
     db.collection('restaurants').document(rid).update({field: cats})
     return JsonResponse({'ok': True})
 
@@ -803,64 +693,46 @@ def finance_category_delete(request):
 
 @login_required
 def table_categories(request):
-    db  = get_db()
-    rid = get_restaurant_id(request)
-
+    db = get_db(); rid = get_restaurant_id(request)
     if request.method == 'GET':
-        doc  = db.collection('restaurants').document(rid).get()
+        doc = db.collection('restaurants').document(rid).get()
         data = doc.to_dict() if doc.exists else {}
-        cats = data.get('tableCategories', [])
-        return JsonResponse({'categories': cats})
-
+        return JsonResponse({'categories': data.get('tableCategories', [])})
     if request.method == 'POST':
-        data = json.loads(request.body)
-        name = data.get('name', '').strip()
-        if not name:
-            return JsonResponse({'error': 'Название обязательно'}, status=400)
-        doc  = db.collection('restaurants').document(rid).get()
+        data = json.loads(request.body); name = data.get('name', '').strip()
+        if not name: return JsonResponse({'error': 'Название обязательно'}, status=400)
+        doc = db.collection('restaurants').document(rid).get()
         rest = doc.to_dict() if doc.exists else {}
         cats = rest.get('tableCategories', [])
-        if name not in cats:
-            cats.append(name)
+        if name not in cats: cats.append(name)
         db.collection('restaurants').document(rid).update({'tableCategories': cats})
         return JsonResponse({'ok': True})
-
     return JsonResponse({'error': 'Method not allowed'}, status=405)
-
 
 @login_required
 @csrf_exempt
 def table_category_delete(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    data = json.loads(request.body)
-    name = data.get('name', '')
-    db   = get_db()
-    rid  = get_restaurant_id(request)
-    doc  = db.collection('restaurants').document(rid).get()
+    if request.method != 'POST': return JsonResponse({'error': 'Method not allowed'}, status=405)
+    data = json.loads(request.body); name = data.get('name', '')
+    db = get_db(); rid = get_restaurant_id(request)
+    doc = db.collection('restaurants').document(rid).get()
     rest = doc.to_dict() if doc.exists else {}
     cats = [c for c in rest.get('tableCategories', []) if c != name]
     db.collection('restaurants').document(rid).update({'tableCategories': cats})
-    # Убираем категорию у столов
     for t in db.collection('restaurants').document(rid).collection('tables').stream():
         if t.to_dict().get('category') == name:
             t.reference.update({'category': ''})
     return JsonResponse({'ok': True})
 
-
 @login_required
 @csrf_exempt
 def update_table_category(request, table_id):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    data = json.loads(request.body)
-    db   = get_db()
-    rid  = get_restaurant_id(request)
+    if request.method != 'POST': return JsonResponse({'error': 'Method not allowed'}, status=405)
+    data = json.loads(request.body); db = get_db(); rid = get_restaurant_id(request)
     db.collection('restaurants').document(rid).collection('tables').document(table_id).update({
         'category': data.get('category', '')
     })
     return JsonResponse({'ok': True})
-
 
 @login_required
 def waiter_report(request):
@@ -868,18 +740,14 @@ def waiter_report(request):
         'restaurant_name': request.session.get('restaurant_name', ''),
     })
 
-
 @login_required
 @csrf_exempt
 def update_dish_availability(request, cat_id, dish_id):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    data = json.loads(request.body)
-    db   = get_db()
-    rid  = get_restaurant_id(request)
-    db.collection('restaurants').document(rid)      .collection('categories').document(cat_id)      .collection('dishes').document(dish_id)      .update({'isAvailable': data.get('isAvailable', True)})
+    if request.method != 'POST': return JsonResponse({'error': 'Method not allowed'}, status=405)
+    data = json.loads(request.body); db = get_db(); rid = get_restaurant_id(request)
+    db.collection('restaurants').document(rid).collection('categories').document(cat_id)\
+      .collection('dishes').document(dish_id).update({'isAvailable': data.get('isAvailable', True)})
     return JsonResponse({'ok': True})
-
 
 @login_required
 def z_report(request):
@@ -890,17 +758,11 @@ def z_report(request):
 @login_required
 @csrf_exempt
 def z_report_close(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    data = json.loads(request.body)
-    db   = get_db()
-    rid  = get_restaurant_id(request)
+    if request.method != 'POST': return JsonResponse({'error': 'Method not allowed'}, status=405)
+    data = json.loads(request.body); db = get_db(); rid = get_restaurant_id(request)
     db.collection('z_reports').add({
-        'restaurantId': rid,
-        'date':         data.get('date', ''),
-        'revenue':      data.get('revenue', 0),
-        'orders':       data.get('orders', 0),
-        'closedBy':     request.session.get('uid', ''),
-        'closedAt':     firestore.SERVER_TIMESTAMP,
+        'restaurantId': rid, 'date': data.get('date', ''),
+        'revenue': data.get('revenue', 0), 'orders': data.get('orders', 0),
+        'closedBy': request.session.get('uid', ''), 'closedAt': firestore.SERVER_TIMESTAMP,
     })
     return JsonResponse({'ok': True})
