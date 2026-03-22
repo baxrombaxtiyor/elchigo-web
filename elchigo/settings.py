@@ -13,6 +13,10 @@ DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.onrender.com',
+]
+
 INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'elchigo',
@@ -20,6 +24,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -43,42 +48,57 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'elchigo.wsgi.application'
 
-# Sessions
-SESSION_ENGINE = 'django.contrib.sessions.backends.file'
+# ── Сессии ────────────────────────────────────────────────────────────────────
+SESSION_ENGINE    = 'django.contrib.sessions.backends.file'
 SESSION_FILE_PATH = BASE_DIR / 'sessions'
 SESSION_FILE_PATH.mkdir(exist_ok=True)
 
-# Localization
-LANGUAGE_CODE = 'ru'
-TIME_ZONE = 'Asia/Tashkent'
-USE_I18N = True
-USE_TZ = True
-
-# Static files (ВАЖНО для Render)
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
-# Firebase через ENV (ВАЖНО)
-FIREBASE_CREDENTIALS = os.getenv('FIREBASE_CREDENTIALS')
-
-FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', '')
-FIREBASE_API_KEY = os.getenv('FIREBASE_API_KEY', '')
-
-# Security cookies
-SESSION_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_HTTPONLY = False
+SESSION_COOKIE_SAMESITE    = 'Lax'
+CSRF_COOKIE_SAMESITE       = 'Lax'
+CSRF_COOKIE_HTTPONLY       = False
 SESSION_SAVE_EVERY_REQUEST = True
 
-# Firebase init (исправлено)
+# ── Локализация ───────────────────────────────────────────────────────────────
+LANGUAGE_CODE = 'ru'
+TIME_ZONE     = 'Asia/Tashkent'
+USE_I18N      = True
+USE_TZ        = True
+
+# ── Статика ───────────────────────────────────────────────────────────────────
+STATIC_URL   = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT  = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# ── Firebase публичные ключи ──────────────────────────────────────────────────
+FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID', '')
+FIREBASE_API_KEY    = os.getenv('FIREBASE_API_KEY', '')
+
+# ── Firebase Admin SDK ────────────────────────────────────────────────────────
 import firebase_admin
 from firebase_admin import credentials as fb_creds
+
+# Читаем из FIREBASE_CREDENTIALS_JSON или FIREBASE_CREDENTIALS
+FIREBASE_CREDENTIALS = os.getenv('FIREBASE_CREDENTIALS_JSON', '') or \
+                       os.getenv('FIREBASE_CREDENTIALS', '')
 
 try:
     firebase_admin.get_app()
 except ValueError:
     if FIREBASE_CREDENTIALS:
-        cred_dict = json.loads(FIREBASE_CREDENTIALS)
-        cred = fb_creds.Certificate(cred_dict)
-        firebase_admin.initialize_app(cred)
+        try:
+            cred_dict = json.loads(FIREBASE_CREDENTIALS)
+            cred = fb_creds.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+            print('✅ Firebase initialized successfully')
+        except Exception as e:
+            print(f'❌ Firebase init error: {e}')
+    else:
+        # Локально — используем файл
+        cred_file = BASE_DIR / 'serviceAccountKey.json'
+        if cred_file.exists():
+            cred = fb_creds.Certificate(str(cred_file))
+            firebase_admin.initialize_app(cred)
+            print('✅ Firebase initialized from file')
+        else:
+            print('❌ Firebase credentials not found!')
