@@ -49,9 +49,8 @@ TEMPLATES = [
 WSGI_APPLICATION = 'elchigo.wsgi.application'
 
 # ── Сессии ────────────────────────────────────────────────────────────────────
-SESSION_ENGINE    = 'django.contrib.sessions.backends.file'
-SESSION_FILE_PATH = BASE_DIR / 'sessions'
-SESSION_FILE_PATH.mkdir(exist_ok=True)
+# Вместо файловых сессий используем куки
+SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
 
 SESSION_COOKIE_SAMESITE    = 'Lax'
 CSRF_COOKIE_SAMESITE       = 'Lax'
