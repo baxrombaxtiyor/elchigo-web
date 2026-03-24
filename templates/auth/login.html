@@ -88,7 +88,7 @@ firebase.initializeApp(firebaseConfig);
 // Получаем CSRF токен при загрузке страницы
 async function ensureCsrf() {
   // Делаем GET запрос чтобы Django установил csrftoken cookie
-  await fetch('/login/', {method: 'GET', credentials: 'include'});
+  await fetch('/', {method: 'GET', credentials: 'include'});
 }
 
 async function doLogin(){
@@ -113,7 +113,7 @@ async function doLogin(){
     const csrf = getCookie('csrftoken');
 
     // Шаг 3: Отправляем на Django
-    const res = await fetch('/login/', {
+    const res = await fetch('/', {
       method: 'POST',
       credentials: 'include',
       headers: {
