@@ -21,10 +21,8 @@ body{
 .logo-elchi{font-family:'Barlow',sans-serif;font-weight:900;font-size:28px;color:#111}
 .logo-go{font-family:'Barlow',sans-serif;font-weight:900;font-size:28px;color:#8B0000}
 .logo-sub{font-size:12px;color:#888;margin-left:4px;margin-top:6px}
-
 h2{font-family:'Barlow',sans-serif;font-size:24px;font-weight:800;margin-bottom:6px}
 .subtitle{font-size:14px;color:#888;margin-bottom:28px}
-
 .form-group{margin-bottom:16px}
 .form-label{font-size:12px;font-weight:600;color:#888;margin-bottom:6px;display:block}
 .form-input{
@@ -33,7 +31,6 @@ h2{font-family:'Barlow',sans-serif;font-size:24px;font-weight:800;margin-bottom:
   outline:none;transition:box-shadow .15s;
 }
 .form-input:focus{box-shadow:0 0 0 2px #8B0000}
-
 .btn-login{
   width:100%;padding:14px;background:#8B0000;color:#fff;border:none;
   border-radius:10px;font-family:'Barlow',sans-serif;font-size:16px;
@@ -42,7 +39,6 @@ h2{font-family:'Barlow',sans-serif;font-size:24px;font-weight:800;margin-bottom:
 }
 .btn-login:hover{background:#6B0000}
 .btn-login:disabled{background:#ccc;cursor:not-allowed}
-
 .error{
   background:#CC000010;border:1px solid #CC000030;color:#8B0000;
   border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;
@@ -79,17 +75,21 @@ h2{font-family:'Barlow',sans-serif;font-size:24px;font-weight:800;margin-bottom:
 </div>
 
 <script>
-// ⚠️ ЗАМЕНИТЕ НА ВАШИ ДАННЫЕ из Firebase Console → Project Settings → Web App
 const firebaseConfig = {
   apiKey: "AIzaSyBpO6ExODPf-U2pnE-SQ7g99m-VT4BLYj4",
   authDomain: "elchi-2ffef.firebaseapp.com",
   projectId: "elchi-2ffef",
   storageBucket: "elchi-2ffef.firebasestorage.app",
   messagingSenderId: "796988718541",
-  appId: "1:796988718541:web:402e5e42eaed050b521884",
-  measurementId: "G-5QP3JRT9MT"
+  appId: "1:796988718541:web:402e5e42eaed050b521884"
 };
 firebase.initializeApp(firebaseConfig);
+
+// Получаем CSRF токен при загрузке страницы
+async function ensureCsrf() {
+  // Делаем GET запрос чтобы Django установил csrftoken cookie
+  await fetch('/login/', {method: 'GET', credentials: 'include'});
+}
 
 async function doLogin(){
   const email    = document.getElementById('email').value.trim();
@@ -97,35 +97,47 @@ async function doLogin(){
   const btn      = document.getElementById('loginBtn');
   const errEl    = document.getElementById('error-msg');
 
-  if(!email || !password){
-    showError('Введите email и пароль');
-    return;
-  }
+  if(!email || !password){ showError('Введите email и пароль'); return; }
 
   btn.disabled = true;
   btn.textContent = 'Входим...';
   errEl.style.display = 'none';
 
   try {
-    const cred = await firebase.auth().signInWithEmailAndPassword(email, password);
+    // Шаг 1: Firebase auth
+    const cred    = await firebase.auth().signInWithEmailAndPassword(email, password);
     const idToken = await cred.user.getIdToken();
 
+    // Шаг 2: Убедимся что CSRF cookie есть
+    await ensureCsrf();
     const csrf = getCookie('csrftoken');
-    const res = await fetch('/', {
+
+    // Шаг 3: Отправляем на Django
+    const res = await fetch('/login/', {
       method: 'POST',
-      headers: {'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken':csrf},
-      body: new URLSearchParams({idToken}),
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrf
+      },
+      body: JSON.stringify({idToken}),
     });
-    const data = await res.json();
+
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch(e) { showError('Ошибка сервера: ' + text.substring(0, 100)); return; }
 
     if(data.ok) window.location.href = '/dashboard/';
     else showError(data.error || 'Ошибка входа');
+
   } catch(e) {
     const msgs = {
       'auth/user-not-found':'Пользователь не найден',
       'auth/wrong-password':'Неверный пароль',
       'auth/invalid-email':'Неверный email',
       'auth/too-many-requests':'Слишком много попыток',
+      'auth/invalid-credential':'Неверный email или пароль',
     };
     showError(msgs[e.code] || e.message);
   } finally {
@@ -145,9 +157,7 @@ function getCookie(name){
   return v ? v.pop() : '';
 }
 
-document.addEventListener('keydown', e => {
-  if(e.key === 'Enter') doLogin();
-});
+document.addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
 </script>
 </body>
 </html>
