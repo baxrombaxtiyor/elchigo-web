@@ -5,18 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ELCHIGO — Вход</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{
-  font-family:'Inter',sans-serif;background:#F2F2F2;
-  min-height:100vh;display:flex;align-items:center;justify-content:center;
-}
-.login-wrap{
-  background:#fff;border-radius:20px;padding:44px 40px;
-  width:100%;max-width:420px;
-}
+body{font-family:'Inter',sans-serif;background:#F2F2F2;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.login-wrap{background:#fff;border-radius:20px;padding:44px 40px;width:100%;max-width:420px}
 .logo{display:flex;align-items:center;gap:2px;margin-bottom:32px}
 .logo-elchi{font-family:'Barlow',sans-serif;font-weight:900;font-size:28px;color:#111}
 .logo-go{font-family:'Barlow',sans-serif;font-weight:900;font-size:28px;color:#8B0000}
@@ -25,25 +17,12 @@ h2{font-family:'Barlow',sans-serif;font-size:24px;font-weight:800;margin-bottom:
 .subtitle{font-size:14px;color:#888;margin-bottom:28px}
 .form-group{margin-bottom:16px}
 .form-label{font-size:12px;font-weight:600;color:#888;margin-bottom:6px;display:block}
-.form-input{
-  width:100%;padding:12px 14px;border:none;border-radius:8px;
-  background:#F2F2F2;font-size:14px;font-family:'Inter',sans-serif;
-  outline:none;transition:box-shadow .15s;
-}
+.form-input{width:100%;padding:12px 14px;border:none;border-radius:8px;background:#F2F2F2;font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:box-shadow .15s}
 .form-input:focus{box-shadow:0 0 0 2px #8B0000}
-.btn-login{
-  width:100%;padding:14px;background:#8B0000;color:#fff;border:none;
-  border-radius:10px;font-family:'Barlow',sans-serif;font-size:16px;
-  font-weight:700;cursor:pointer;letter-spacing:.5px;
-  transition:background .15s;margin-top:8px;
-}
+.btn-login{width:100%;padding:14px;background:#8B0000;color:#fff;border:none;border-radius:10px;font-family:'Barlow',sans-serif;font-size:16px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:background .15s;margin-top:8px}
 .btn-login:hover{background:#6B0000}
 .btn-login:disabled{background:#ccc;cursor:not-allowed}
-.error{
-  background:#CC000010;border:1px solid #CC000030;color:#8B0000;
-  border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;
-  display:none;
-}
+.error{background:#CC000010;border:1px solid #CC000030;color:#8B0000;border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;display:none}
 </style>
 </head>
 <body>
@@ -53,12 +32,9 @@ h2{font-family:'Barlow',sans-serif;font-size:24px;font-weight:800;margin-bottom:
     <span class="logo-go">GO</span>
     <span class="logo-sub">Панель ресторана</span>
   </div>
-
   <h2>Добро пожаловать</h2>
   <p class="subtitle">Войдите в аккаунт ресторана</p>
-
   <div class="error" id="error-msg"></div>
-
   <div class="form-group">
     <label class="form-label">Email</label>
     <input type="email" class="form-input" id="email" placeholder="restaurant@elchigo.uz">
@@ -67,7 +43,6 @@ h2{font-family:'Barlow',sans-serif;font-size:24px;font-weight:800;margin-bottom:
     <label class="form-label">Пароль</label>
     <input type="password" class="form-input" id="password" placeholder="••••••••">
   </div>
-
   <button class="btn-login" id="loginBtn" onclick="doLogin()">Войти</button>
   <div style="text-align:center;margin-top:20px;font-size:13px;color:#888">
     Нет аккаунта? <a href="/register/" style="color:#8B0000;font-weight:600;text-decoration:none">Зарегистрироваться</a>
@@ -75,89 +50,76 @@ h2{font-family:'Barlow',sans-serif;font-size:24px;font-weight:800;margin-bottom:
 </div>
 
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyBpO6ExODPf-U2pnE-SQ7g99m-VT4BLYj4",
-  authDomain: "elchi-2ffef.firebaseapp.com",
-  projectId: "elchi-2ffef",
-  storageBucket: "elchi-2ffef.firebasestorage.app",
-  messagingSenderId: "796988718541",
-  appId: "1:796988718541:web:402e5e42eaed050b521884"
-};
-firebase.initializeApp(firebaseConfig);
+const FIREBASE_API_KEY = "AIzaSyBpO6ExODPf-U2pnE-SQ7g99m-VT4BLYj4";
 
-// Получаем CSRF токен при загрузке страницы
-async function ensureCsrf() {
-  // Делаем GET запрос чтобы Django установил csrftoken cookie
-  await fetch('/', {method: 'GET', credentials: 'include'});
-}
-
-async function doLogin(){
+async function doLogin() {
   const email    = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   const btn      = document.getElementById('loginBtn');
   const errEl    = document.getElementById('error-msg');
 
-  if(!email || !password){ showError('Введите email и пароль'); return; }
+  if (!email || !password) { showError('Введите email и пароль'); return; }
 
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = 'Входим...';
   errEl.style.display = 'none';
 
   try {
-    // Шаг 1: Firebase auth
-    const cred    = await firebase.auth().signInWithEmailAndPassword(email, password);
-    const idToken = await cred.user.getIdToken();
+    // Шаг 1: Firebase REST API (без SDK)
+    const fbRes = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email, password, returnSecureToken: true})
+      }
+    );
+    const fbData = await fbRes.json();
 
-    // Шаг 2: Убедимся что CSRF cookie есть
-    await ensureCsrf();
-    const csrf = getCookie('csrftoken');
+    if (fbData.error) {
+      const msgs = {
+        'EMAIL_NOT_FOUND':      'Пользователь не найден',
+        'INVALID_PASSWORD':     'Неверный пароль',
+        'INVALID_EMAIL':        'Неверный email',
+        'TOO_MANY_ATTEMPTS_TRY_LATER': 'Слишком много попыток',
+        'INVALID_LOGIN_CREDENTIALS': 'Неверный email или пароль',
+      };
+      showError(msgs[fbData.error.message] || fbData.error.message);
+      return;
+    }
 
-    // Шаг 3: Отправляем на Django
+    const idToken = fbData.idToken;
+
+    // Шаг 2: Отправить token на Django
     const res = await fetch('/', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrf
-      },
-      body: JSON.stringify({idToken}),
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({idToken}),
     });
 
     const text = await res.text();
     let data;
-    try { data = JSON.parse(text); }
-    catch(e) { showError('Ошибка сервера: ' + text.substring(0, 100)); return; }
+    try   { data = JSON.parse(text); }
+    catch { showError('Ошибка сервера: ' + text.substring(0, 150)); return; }
 
-    if(data.ok) window.location.href = '/dashboard/';
+    if (data.ok) window.location.href = '/dashboard/';
     else showError(data.error || 'Ошибка входа');
 
   } catch(e) {
-    const msgs = {
-      'auth/user-not-found':'Пользователь не найден',
-      'auth/wrong-password':'Неверный пароль',
-      'auth/invalid-email':'Неверный email',
-      'auth/too-many-requests':'Слишком много попыток',
-      'auth/invalid-credential':'Неверный email или пароль',
-    };
-    showError(msgs[e.code] || e.message);
+    showError('Ошибка сети: ' + e.message);
   } finally {
-    btn.disabled = false;
+    btn.disabled    = false;
     btn.textContent = 'Войти';
   }
 }
 
-function showError(msg){
+function showError(msg) {
   const el = document.getElementById('error-msg');
-  el.textContent = msg;
+  el.textContent   = msg;
   el.style.display = 'block';
 }
 
-function getCookie(name){
-  const v = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
-  return v ? v.pop() : '';
-}
-
-document.addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
+document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 </script>
 </body>
 </html>
