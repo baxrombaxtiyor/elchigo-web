@@ -42,7 +42,7 @@ def _parse_dt(created):
 
 # ─── AUTH ─────────────────────────────────────────────────────────────────────
 
-@ensure_csrf_cookie
+@csrf_exempt
 def login_view(request):
     if request.session.get('uid'):
         return redirect('dashboard')
