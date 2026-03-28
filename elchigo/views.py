@@ -1,5 +1,6 @@
 # elchigo/views.py
 import json
+import socket
 import logging
 from datetime import datetime, timedelta
 from functools import wraps
@@ -752,3 +753,139 @@ def finance_category_delete(request):
     cats = [c for c in rest.get(field, []) if c != name]
     db.collection('restaurants').document(rid).update({field: cats})
     return JsonResponse({'ok': True})
+
+
+# ─── PRINTERS ─────────────────────────────────────────────────────────────────
+
+@login_required
+def printers(request):
+    return render(request, 'printers/index.html', {
+        'restaurant_name': request.session.get('restaurant_name', ''),
+    })
+
+@login_required
+def printers_api(request):
+    db = get_db(); rid = get_restaurant_id(request)
+    printers_list = []
+    for doc in db.collection('restaurants').document(rid).collection('printers').stream():
+        p = doc.to_dict(); p['id'] = doc.id
+        printers_list.append(p)
+    return JsonResponse({'printers': printers_list})
+
+@login_required
+@csrf_exempt
+def printer_add(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    data = json.loads(request.body)
+    db = get_db(); rid = get_restaurant_id(request)
+    name = data.get('name', '').strip()
+    ip   = data.get('ip', '').strip()
+    port = int(data.get('port', 9100))
+    role = data.get('role', 'cashier')
+    if not name or not ip:
+        return JsonResponse({'error': 'Название и IP обязательны'}, status=400)
+    db.collection('restaurants').document(rid).collection('printers').add({
+        'name': name, 'ip': ip, 'port': port, 'role': role, 'enabled': True,
+    })
+    return JsonResponse({'ok': True})
+
+@login_required
+@csrf_exempt
+def printer_update(request, printer_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    data = json.loads(request.body)
+    db = get_db(); rid = get_restaurant_id(request)
+    db.collection('restaurants').document(rid).collection('printers').document(printer_id).update({
+        'name': data.get('name', ''),
+        'ip':   data.get('ip', ''),
+        'port': int(data.get('port', 9100)),
+        'role': data.get('role', 'cashier'),
+    })
+    return JsonResponse({'ok': True})
+
+@login_required
+@csrf_exempt
+def printer_delete(request, printer_id):
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    db = get_db(); rid = get_restaurant_id(request)
+    db.collection('restaurants').document(rid).collection('printers').document(printer_id).delete()
+    return JsonResponse({'ok': True})
+
+@login_required
+@csrf_exempt
+def printer_test(request, printer_id):
+    """Отправляет тестовый ESC/POS чек на принтер"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    db = get_db(); rid = get_restaurant_id(request)
+    doc = db.collection('restaurants').document(rid).collection('printers').document(printer_id).get()
+    if not doc.exists:
+        return JsonResponse({'error': 'Принтер не найден'}, status=404)
+    p = doc.to_dict()
+    ip   = p.get('ip', '')
+    port = int(p.get('port', 9100))
+    name = p.get('name', 'Принтер')
+    try:
+        ESC      = b'\x1b'
+        INIT     = ESC + b'@'
+        BOLD_ON  = ESC + b'\x45\x01'
+        BOLD_OFF = ESC + b'\x45\x00'
+        CENTER   = ESC + b'\x61\x01'
+        LEFT     = ESC + b'\x61\x00'
+        CUT      = b'\x1d\x56\x41\x03'
+
+        rest_name = request.session.get('restaurant_name', 'ELCHIGO')
+        now_str   = datetime.now().strftime('%d.%m.%Y %H:%M')
+
+        payload = (
+            INIT +
+            CENTER + BOLD_ON +
+            f'{rest_name}\n'.encode('cp866', errors='replace') +
+            BOLD_OFF +
+            '--- ТЕСТОВЫЙ ЧЕК ---\n'.encode('cp866', errors='replace') +
+            LEFT +
+            f'Принтер: {name}\n'.encode('cp866', errors='replace') +
+            f'IP: {ip}:{port}\n'.encode('cp866', errors='replace') +
+            f'Дата: {now_str}\n'.encode('cp866', errors='replace') +
+            b'--------------------------------\n' +
+            CENTER +
+            'Принтер работает!\n'.encode('cp866', errors='replace') +
+            b'\n\n\n' +
+            CUT
+        )
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        sock.connect((ip, port))
+        sock.sendall(payload)
+        sock.close()
+        return JsonResponse({'ok': True})
+    except Exception as e:
+        logger.error(f"Printer test error: {e}")
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+# ─── RECEIPT SETTINGS ─────────────────────────────────────────────────────────
+
+@login_required
+def receipt_settings_view(request):
+    return render(request, 'printers/receipt_settings.html', {
+        'restaurant_name': request.session.get('restaurant_name', ''),
+    })
+
+@login_required
+@csrf_exempt
+def receipt_settings_api(request):
+    db = get_db(); rid = get_restaurant_id(request)
+    if request.method == 'GET':
+        doc = db.collection('restaurants').document(rid).get()
+        data = doc.to_dict() if doc.exists else {}
+        return JsonResponse({'settings': data.get('receiptSettings', {})})
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        db.collection('restaurants').document(rid).update({'receiptSettings': data})
+        return JsonResponse({'ok': True})
+    return JsonResponse({'error': 'Method not allowed'}, status=405)

@@ -1,0 +1,512 @@
+{% extends 'base.html' %}
+{% block title %}Настройка чека{% endblock %}
+{% block page_title %}Настройка чека{% endblock %}
+
+{% block extra_css %}
+<style>
+.receipt-layout{display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:start}
+.receipt-preview-wrap{position:sticky;top:84px}
+.receipt-preview{
+  background:#fff;border-radius:14px;padding:20px;
+  border:1.5px solid var(--grey2);
+}
+.receipt-preview-title{font-family:'Barlow',sans-serif;font-size:14px;font-weight:800;
+  color:var(--muted);margin-bottom:16px;text-transform:uppercase;letter-spacing:1px}
+
+/* Чек */
+.receipt-paper{
+  background:#fff;width:100%;font-family:'Courier New',monospace;
+  font-size:12px;line-height:1.6;color:#111;
+  border:1px dashed #ddd;border-radius:4px;padding:16px;
+}
+.receipt-paper .r-logo{text-align:center;margin-bottom:8px}
+.receipt-paper .r-logo img{max-height:48px;max-width:120px;object-fit:contain}
+.receipt-paper .r-center{text-align:center}
+.receipt-paper .r-left{text-align:left}
+.receipt-paper .r-right{text-align:right}
+.receipt-paper .r-bold{font-weight:700}
+.receipt-paper .r-lg{font-size:15px}
+.receipt-paper .r-xl{font-size:18px}
+.receipt-paper .r-divider{border:none;border-top:1px dashed #ccc;margin:8px 0}
+.receipt-paper .r-row{display:flex;justify-content:space-between;margin:2px 0}
+.receipt-paper .r-total-row{display:flex;justify-content:space-between;margin:4px 0;font-size:15px;font-weight:700}
+.receipt-paper .r-qr{text-align:center;margin-top:10px}
+.receipt-paper .r-qr svg{opacity:.7}
+
+/* Настройки */
+.settings-panel{display:flex;flex-direction:column;gap:12px}
+.setting-block{
+  background:#fff;border-radius:12px;border:1.5px solid var(--grey2);overflow:hidden;
+}
+.setting-block-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;cursor:pointer;
+}
+.setting-block-title{font-family:'Barlow',sans-serif;font-size:15px;font-weight:800}
+.setting-block-body{padding:0 16px 16px;border-top:1px solid var(--grey2)}
+
+/* Toggle */
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{
+  position:absolute;inset:0;background:#ddd;border-radius:12px;
+  cursor:pointer;transition:.2s;
+}
+.toggle input:checked + .toggle-slider{background:var(--dark-red)}
+.toggle-slider:before{
+  content:'';position:absolute;width:18px;height:18px;
+  left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;
+}
+.toggle input:checked + .toggle-slider:before{transform:translateX(20px)}
+
+/* Size/align buttons */
+.btn-group{display:flex;gap:4px;flex-wrap:wrap}
+.btn-group-btn{
+  padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;
+  border:1.5px solid var(--grey2);background:#fff;cursor:pointer;
+  color:var(--muted);transition:all .15s;font-family:'Inter',sans-serif;
+}
+.btn-group-btn.active{background:var(--dark-red);color:#fff;border-color:var(--dark-red)}
+.setting-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.setting-row:last-child{margin-bottom:0}
+.setting-row-label{font-size:12px;font-weight:600;color:var(--muted)}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:10px">
+  <button class="btn btn-outline" onclick="resetSettings()">Сбросить</button>
+  <button class="btn btn-primary" onclick="saveSettings()">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+    </svg>
+    Сохранить
+  </button>
+</div>
+
+<div class="receipt-layout">
+  <!-- Превью чека -->
+  <div class="receipt-preview-wrap">
+    <div class="receipt-preview">
+      <div class="receipt-preview-title">Предпросмотр</div>
+      <div class="receipt-paper" id="receipt-preview">
+        <!-- Генерируется JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Настройки -->
+  <div class="settings-panel" id="settings-panel">
+
+    <!-- Логотип -->
+    <div class="setting-block">
+      <div class="setting-block-header">
+        <span class="setting-block-title">Логотип</span>
+        <label class="toggle"><input type="checkbox" id="s-logo" onchange="renderPreview()"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="setting-block-body" id="body-logo" style="display:none">
+        <div class="form-group" style="margin:12px 0 0">
+          <label class="form-label">URL логотипа (необязательно)</label>
+          <input class="form-input" id="s-logo-url" placeholder="https://..." oninput="renderPreview()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Название компании -->
+    <div class="setting-block">
+      <div class="setting-block-header">
+        <span class="setting-block-title">Название компании</span>
+        <label class="toggle"><input type="checkbox" id="s-name" checked onchange="renderPreview()"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="setting-block-body" id="body-name">
+        <div style="margin-top:12px">
+          <div class="setting-row">
+            <span class="setting-row-label">Размер текста</span>
+            <div class="btn-group">
+              <button class="btn-group-btn" onclick="setOpt('name-size','sm',this)">Маленький</button>
+              <button class="btn-group-btn active" onclick="setOpt('name-size','md',this)">Стандарт</button>
+              <button class="btn-group-btn" onclick="setOpt('name-size','lg',this)">Большой</button>
+              <button class="btn-group-btn" onclick="setOpt('name-size','xl',this)">Очень большой</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="setting-row-label">Выравнивание</span>
+            <div class="btn-group">
+              <button class="btn-group-btn" onclick="setOpt('name-align','left',this)">Влево</button>
+              <button class="btn-group-btn active" onclick="setOpt('name-align','center',this)">По центру</button>
+              <button class="btn-group-btn" onclick="setOpt('name-align','right',this)">Вправо</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <span class="setting-row-label">Жирность</span>
+            <div class="btn-group">
+              <button class="btn-group-btn active" onclick="setOpt('name-weight','normal',this)">Обычный</button>
+              <button class="btn-group-btn" onclick="setOpt('name-weight','bold',this)">Жирный</button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:8px;margin-bottom:0">
+            <label class="form-label">Текст (оставьте пустым — будет название ресторана)</label>
+            <input class="form-input" id="s-name-text" placeholder="{{ restaurant_name }}" oninput="renderPreview()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Номер заказа -->
+    <div class="setting-block">
+      <div class="setting-block-header">
+        <span class="setting-block-title">Номер заказа</span>
+        <label class="toggle"><input type="checkbox" id="s-order-num" checked onchange="renderPreview()"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="setting-block-body" id="body-order-num">
+        <div style="margin-top:12px">
+          <div class="setting-row">
+            <span class="setting-row-label">Выравнивание</span>
+            <div class="btn-group">
+              <button class="btn-group-btn" onclick="setOpt('ordernum-align','left',this)">Влево</button>
+              <button class="btn-group-btn active" onclick="setOpt('ordernum-align','center',this)">По центру</button>
+              <button class="btn-group-btn" onclick="setOpt('ordernum-align','right',this)">Вправо</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Дата -->
+    <div class="setting-block">
+      <div class="setting-block-header">
+        <span class="setting-block-title">Дата и время</span>
+        <label class="toggle"><input type="checkbox" id="s-date" checked onchange="renderPreview()"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="setting-block-body" id="body-date">
+        <div style="margin-top:12px">
+          <div class="setting-row">
+            <span class="setting-row-label">Выравнивание</span>
+            <div class="btn-group">
+              <button class="btn-group-btn active" onclick="setOpt('date-align','left',this)">Влево</button>
+              <button class="btn-group-btn" onclick="setOpt('date-align','center',this)">По центру</button>
+              <button class="btn-group-btn" onclick="setOpt('date-align','right',this)">Вправо</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Список блюд -->
+    <div class="setting-block">
+      <div class="setting-block-header">
+        <span class="setting-block-title">Список блюд</span>
+        <label class="toggle"><input type="checkbox" id="s-items" checked onchange="renderPreview()"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="setting-block-body" id="body-items">
+        <div style="margin-top:12px">
+          <div class="setting-row">
+            <span class="setting-row-label">Показывать цену за единицу</span>
+            <label class="toggle"><input type="checkbox" id="s-items-price" checked onchange="renderPreview()"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="setting-row">
+            <span class="setting-row-label">Показывать итог по позиции</span>
+            <label class="toggle"><input type="checkbox" id="s-items-total" checked onchange="renderPreview()"><span class="toggle-slider"></span></label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Итого -->
+    <div class="setting-block">
+      <div class="setting-block-header">
+        <span class="setting-block-title">Итого</span>
+        <label class="toggle"><input type="checkbox" id="s-total" checked onchange="renderPreview()"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="setting-block-body" id="body-total">
+        <div style="margin-top:12px">
+          <div class="setting-row">
+            <span class="setting-row-label">Показывать метод оплаты</span>
+            <label class="toggle"><input type="checkbox" id="s-payment-method" checked onchange="renderPreview()"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="setting-row">
+            <span class="setting-row-label">Показывать сдачу</span>
+            <label class="toggle"><input type="checkbox" id="s-change" checked onchange="renderPreview()"><span class="toggle-slider"></span></label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Сообщение -->
+    <div class="setting-block">
+      <div class="setting-block-header">
+        <span class="setting-block-title">Сообщение (нижний текст)</span>
+        <label class="toggle"><input type="checkbox" id="s-footer" checked onchange="renderPreview()"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="setting-block-body" id="body-footer">
+        <div style="margin-top:12px">
+          <div class="setting-row">
+            <span class="setting-row-label">Выравнивание</span>
+            <div class="btn-group">
+              <button class="btn-group-btn" onclick="setOpt('footer-align','left',this)">Влево</button>
+              <button class="btn-group-btn active" onclick="setOpt('footer-align','center',this)">По центру</button>
+              <button class="btn-group-btn" onclick="setOpt('footer-align','right',this)">Вправо</button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:8px;margin-bottom:0">
+            <label class="form-label">Текст</label>
+            <input class="form-input" id="s-footer-text" value="Рахмат! Яна келинг 🙏" oninput="renderPreview()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR код -->
+    <div class="setting-block">
+      <div class="setting-block-header">
+        <span class="setting-block-title">QR код меню</span>
+        <label class="toggle"><input type="checkbox" id="s-qr" onchange="renderPreview()"><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+
+  </div><!-- /settings-panel -->
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const opts = {};
+const RESTAURANT_NAME = '{{ restaurant_name }}';
+const now = new Date();
+const dateStr = now.toLocaleDateString('ru-RU') + ' ' + now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+
+// Переключение тоггл → показ/скрытие body
+document.querySelectorAll('.setting-block .toggle input[type=checkbox]').forEach(cb => {
+  const block = cb.closest('.setting-block');
+  const body  = block.querySelector('.setting-block-body');
+  if (!body) return;
+  cb.addEventListener('change', () => {
+    body.style.display = cb.checked ? '' : 'none';
+  });
+  body.style.display = cb.checked ? '' : 'none';
+});
+
+function setOpt(key, val, btn) {
+  opts[key] = val;
+  const group = btn.closest('.btn-group');
+  group.querySelectorAll('.btn-group-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPreview();
+}
+
+function getOpt(key, def) { return opts[key] || def; }
+
+function renderPreview() {
+  const showLogo      = document.getElementById('s-logo').checked;
+  const logoUrl       = document.getElementById('s-logo-url')?.value || '';
+  const showName      = document.getElementById('s-name').checked;
+  const nameText      = document.getElementById('s-name-text').value || RESTAURANT_NAME;
+  const nameSize      = getOpt('name-size','md');
+  const nameAlign     = getOpt('name-align','center');
+  const nameWeight    = getOpt('name-weight','normal');
+  const showOrderNum  = document.getElementById('s-order-num').checked;
+  const orderNumAlign = getOpt('ordernum-align','center');
+  const showDate      = document.getElementById('s-date').checked;
+  const dateAlign     = getOpt('date-align','left');
+  const showItems     = document.getElementById('s-items').checked;
+  const showItemPrice = document.getElementById('s-items-price').checked;
+  const showItemTotal = document.getElementById('s-items-total').checked;
+  const showTotal     = document.getElementById('s-total').checked;
+  const showMethod    = document.getElementById('s-payment-method').checked;
+  const showChange    = document.getElementById('s-change').checked;
+  const showFooter    = document.getElementById('s-footer').checked;
+  const footerText    = document.getElementById('s-footer-text').value;
+  const footerAlign   = getOpt('footer-align','center');
+  const showQr        = document.getElementById('s-qr').checked;
+
+  const sizeCls = {sm:'',md:'',lg:'r-lg',xl:'r-xl'};
+  const sz = sizeCls[nameSize] || '';
+
+  let html = '';
+
+  if (showLogo) {
+    html += `<div class="r-logo">`;
+    if (logoUrl) html += `<img src="${logoUrl}" onerror="this.style.display='none'">`;
+    else html += `<div style="width:80px;height:40px;background:#eee;border-radius:4px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:10px;color:#aaa">ЛОГОТИП</div>`;
+    html += `</div>`;
+  }
+
+  if (showName) {
+    html += `<div class="r-${nameAlign} ${sz} ${nameWeight==='bold'?'r-bold':''}" style="margin-bottom:2px">${nameText.toUpperCase()}</div>`;
+  }
+
+  html += `<hr class="r-divider">`;
+
+  if (showOrderNum) {
+    html += `<div class="r-${orderNumAlign}">Номер заказа: <b>38</b></div>`;
+  }
+  if (showDate) {
+    html += `<div class="r-${dateAlign}">Дата: ${dateStr}</div>`;
+  }
+  if (showOrderNum || showDate) html += `<hr class="r-divider">`;
+
+  if (showItems) {
+    html += `<div class="r-row"><span style="flex:1"><b>Наименование</b></span>`;
+    if (showItemPrice) html += `<span style="width:50px;text-align:right"><b>Цена</b></span>`;
+    html += `<span style="width:30px;text-align:center"><b>Кол</b></span>`;
+    if (showItemTotal) html += `<span style="width:60px;text-align:right"><b>Итого</b></span>`;
+    html += `</div><hr class="r-divider">`;
+
+    const items = [
+      {name:'Somsa', qty:2, price:8000},
+      {name:'Shashlik tovuqli 200g', qty:1, price:32000},
+      {name:'Chuchvara', qty:3, price:15000},
+    ];
+    items.forEach(item => {
+      html += `<div class="r-row"><span style="flex:1">${item.name}</span>`;
+      if (showItemPrice) html += `<span style="width:50px;text-align:right">${item.price.toLocaleString()}</span>`;
+      html += `<span style="width:30px;text-align:center">${item.qty}</span>`;
+      if (showItemTotal) html += `<span style="width:60px;text-align:right">${(item.price*item.qty).toLocaleString()}</span>`;
+      html += `</div>`;
+    });
+    html += `<hr class="r-divider">`;
+  }
+
+  if (showTotal) {
+    html += `<div class="r-total-row"><span>ИТОГО:</span><span>99 000 UZS</span></div>`;
+    if (showMethod) html += `<div class="r-row"><span>Метод оплаты:</span><span>Naxt</span></div>`;
+    if (showChange) html += `<div class="r-row"><span>Сдача:</span><span>1 000 UZS</span></div>`;
+    html += `<hr class="r-divider">`;
+  }
+
+  if (showFooter && footerText) {
+    html += `<div class="r-${footerAlign} r-bold" style="margin:8px 0">${footerText}</div>`;
+  }
+
+  if (showQr) {
+    html += `<div class="r-qr">
+      <svg width="80" height="80" viewBox="0 0 80 80" fill="#333">
+        <rect x="5" y="5" width="30" height="30" rx="2" fill="none" stroke="#333" stroke-width="4"/>
+        <rect x="12" y="12" width="16" height="16"/>
+        <rect x="45" y="5" width="30" height="30" rx="2" fill="none" stroke="#333" stroke-width="4"/>
+        <rect x="52" y="12" width="16" height="16"/>
+        <rect x="5" y="45" width="30" height="30" rx="2" fill="none" stroke="#333" stroke-width="4"/>
+        <rect x="12" y="52" width="16" height="16"/>
+        <rect x="45" y="45" width="8" height="8"/><rect x="57" y="45" width="8" height="8"/>
+        <rect x="45" y="57" width="8" height="8"/><rect x="57" y="57" width="8" height="8"/>
+        <rect x="69" y="57" width="6" height="6"/>
+      </svg>
+      <div style="font-size:10px;color:#888;margin-top:4px">Отсканируйте для меню</div>
+    </div>`;
+  }
+
+  document.getElementById('receipt-preview').innerHTML = html;
+}
+
+async function saveSettings() {
+  const settings = {
+    logo:         document.getElementById('s-logo').checked,
+    logoUrl:      document.getElementById('s-logo-url')?.value || '',
+    name:         document.getElementById('s-name').checked,
+    nameText:     document.getElementById('s-name-text').value,
+    nameSize:     getOpt('name-size','md'),
+    nameAlign:    getOpt('name-align','center'),
+    nameWeight:   getOpt('name-weight','normal'),
+    orderNum:     document.getElementById('s-order-num').checked,
+    orderNumAlign:getOpt('ordernum-align','center'),
+    date:         document.getElementById('s-date').checked,
+    dateAlign:    getOpt('date-align','left'),
+    items:        document.getElementById('s-items').checked,
+    itemsPrice:   document.getElementById('s-items-price').checked,
+    itemsTotal:   document.getElementById('s-items-total').checked,
+    total:        document.getElementById('s-total').checked,
+    paymentMethod:document.getElementById('s-payment-method').checked,
+    change:       document.getElementById('s-change').checked,
+    footer:       document.getElementById('s-footer').checked,
+    footerText:   document.getElementById('s-footer-text').value,
+    footerAlign:  getOpt('footer-align','center'),
+    qr:           document.getElementById('s-qr').checked,
+  };
+  await fetch('/printers/receipt-settings/save/', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+    body: JSON.stringify(settings),
+  });
+  alert('✅ Настройки чека сохранены!');
+}
+
+async function loadSettings() {
+  try {
+    const r = await fetch('/printers/receipt-settings/');
+    const d = await r.json();
+    const s = d.settings || {};
+    if (!Object.keys(s).length) { renderPreview(); return; }
+
+    const set = (id, val) => { const el = document.getElementById(id); if(el) el[typeof val==='boolean'?'checked':'value'] = val; };
+    set('s-logo', s.logo||false);
+    set('s-logo-url', s.logoUrl||'');
+    set('s-name', s.name!==false);
+    set('s-name-text', s.nameText||'');
+    set('s-order-num', s.orderNum!==false);
+    set('s-date', s.date!==false);
+    set('s-items', s.items!==false);
+    set('s-items-price', s.itemsPrice!==false);
+    set('s-items-total', s.itemsTotal!==false);
+    set('s-total', s.total!==false);
+    set('s-payment-method', s.paymentMethod!==false);
+    set('s-change', s.change!==false);
+    set('s-footer', s.footer!==false);
+    set('s-footer-text', s.footerText||'Рахмат! Яна келинг 🙏');
+    set('s-qr', s.qr||false);
+
+    // opts
+    if(s.nameSize)      opts['name-size']      = s.nameSize;
+    if(s.nameAlign)     opts['name-align']     = s.nameAlign;
+    if(s.nameWeight)    opts['name-weight']    = s.nameWeight;
+    if(s.orderNumAlign) opts['ordernum-align'] = s.orderNumAlign;
+    if(s.dateAlign)     opts['date-align']     = s.dateAlign;
+    if(s.footerAlign)   opts['footer-align']   = s.footerAlign;
+
+    // Sync btn-group active states
+    document.querySelectorAll('.btn-group').forEach(grp => {
+      grp.querySelectorAll('.btn-group-btn').forEach(btn => btn.classList.remove('active'));
+    });
+    Object.entries(opts).forEach(([key, val]) => {
+      document.querySelectorAll('.btn-group-btn').forEach(btn => {
+        if(btn.getAttribute('onclick')?.includes(`'${key}'`) && btn.getAttribute('onclick')?.includes(`'${val}'`))
+          btn.classList.add('active');
+      });
+    });
+
+    // Sync body visibility
+    document.querySelectorAll('.setting-block .toggle input[type=checkbox]').forEach(cb => {
+      const body = cb.closest('.setting-block')?.querySelector('.setting-block-body');
+      if(body) body.style.display = cb.checked ? '' : 'none';
+    });
+
+    renderPreview();
+  } catch(e) { renderPreview(); }
+}
+
+function resetSettings() {
+  if(!confirm('Сбросить настройки чека?')) return;
+  document.querySelectorAll('.toggle input').forEach(cb => {
+    if(['s-name','s-order-num','s-date','s-items','s-items-price','s-items-total','s-total','s-payment-method','s-change','s-footer'].includes(cb.id))
+      cb.checked = true;
+    else cb.checked = false;
+  });
+  document.getElementById('s-footer-text').value = 'Рахмат! Яна келинг 🙏';
+  document.getElementById('s-name-text').value = '';
+  for(const k in opts) delete opts[k];
+  document.querySelectorAll('.btn-group-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.btn-group').forEach(grp => {
+    const first = grp.querySelector('.btn-group-btn'); if(first) first.classList.add('active');
+  });
+  renderPreview();
+}
+
+function getCookie(n) {
+  const v = document.cookie.match('(^|;)\\s*' + n + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : '';
+}
+
+loadSettings();
+</script>
+{% endblock %}
