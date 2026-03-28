@@ -328,6 +328,7 @@ def table_qr(request, table_id):
     })
 
 @login_required
+@csrf_exempt
 def table_categories(request):
     db = get_db(); rid = get_restaurant_id(request)
     if request.method == 'GET':
