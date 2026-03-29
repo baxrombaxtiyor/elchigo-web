@@ -1,5 +1,6 @@
 # elchigo/views.py
 import json
+import socket
 import logging
 from datetime import datetime, timedelta
 from functools import wraps
@@ -146,34 +147,20 @@ def register_view(request):
 def dashboard(request):
     db  = get_db()
     rid = get_restaurant_id(request)
-    now   = datetime.now()
-    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    # ── Заказы ────────────────────────────────────────────────
-    all_orders = [o.to_dict() for o in
-                  db.collection('orders').where('restaurantId', '==', rid).stream()]
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    orders_ref = db.collection('orders').where('restaurantId', '==', rid)
+    all_orders = [o.to_dict() for o in orders_ref.stream()]
     total_orders  = len(all_orders)
+    total_revenue = sum(o.get('totalPrice', 0) for o in all_orders if o.get('status') == 'delivered')
     active_orders = sum(1 for o in all_orders if o.get('status') not in ('delivered', 'cancelled'))
     cancelled     = sum(1 for o in all_orders if o.get('status') == 'cancelled')
-
-    # ── Выручка из payments (сохраняется кассой при оплате) ───
-    all_payments   = []
-    today_payments = []
-    for doc in db.collection('payments').where('restaurantId', '==', rid).stream():
-        p  = doc.to_dict()
-        dt = _parse_dt(p.get('createdAt'))
-        all_payments.append(p)
-        if dt:
-            dt_local = dt + timedelta(hours=5)
-            if dt_local.date() == today.date():
-                today_payments.append(p)
-
-    total_revenue = sum(p.get('total', 0) for p in all_payments)
-    today_revenue = sum(p.get('total', 0) for p in today_payments)
-
-    # ── Последние заказы ──────────────────────────────────────
+    today_orders  = []
+    for o in all_orders:
+        dt = _parse_dt(o.get('createdAt'))
+        if dt and (dt + timedelta(hours=5)).date() == today.date():
+            today_orders.append(o)
+    today_revenue = sum(o.get('totalPrice', 0) for o in today_orders if o.get('status') == 'delivered')
     recent = sorted(all_orders, key=lambda x: str(x.get('createdAt', '')), reverse=True)[:10]
-
     return render(request, 'dashboard/index.html', {
         'restaurant_name': request.session.get('restaurant_name', ''),
         'total_orders':    total_orders,
@@ -342,6 +329,7 @@ def table_qr(request, table_id):
     })
 
 @login_required
+@csrf_exempt
 def table_categories(request):
     db = get_db(); rid = get_restaurant_id(request)
     if request.method == 'GET':
@@ -776,171 +764,128 @@ def printers(request):
     })
 
 @login_required
-@csrf_exempt
 def printers_api(request):
-    db  = get_db()
-    rid = get_restaurant_id(request)
+    db = get_db(); rid = get_restaurant_id(request)
+    printers_list = []
+    for doc in db.collection('restaurants').document(rid).collection('printers').stream():
+        p = doc.to_dict(); p['id'] = doc.id
+        printers_list.append(p)
+    return JsonResponse({'printers': printers_list})
 
-    if request.method == 'GET':
-        printers_list = []
-        for doc in db.collection('restaurants').document(rid).collection('printers').stream():
-            p = doc.to_dict()
-            p['id'] = doc.id
-            printers_list.append(p)
-        return JsonResponse({'printers': printers_list})
+@login_required
+@csrf_exempt
+def printer_add(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    data = json.loads(request.body)
+    db = get_db(); rid = get_restaurant_id(request)
+    name = data.get('name', '').strip()
+    ip   = data.get('ip', '').strip()
+    port = int(data.get('port', 9100))
+    role = data.get('role', 'cashier')
+    if not name or not ip:
+        return JsonResponse({'error': 'Название и IP обязательны'}, status=400)
+    db.collection('restaurants').document(rid).collection('printers').add({
+        'name': name, 'ip': ip, 'port': port, 'role': role, 'enabled': True,
+    })
+    return JsonResponse({'ok': True})
 
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        name     = data.get('name', '').strip()
-        ip       = data.get('ip', '').strip()
-        port     = int(data.get('port', 9100))
-        ptype    = data.get('type', 'cashier')  # cashier | kitchen
-        enabled  = data.get('enabled', True)
-
-        if not name or not ip:
-            return JsonResponse({'error': 'Название и IP обязательны'}, status=400)
-
-        printer_id = data.get('id', '')
-        ref = db.collection('restaurants').document(rid).collection('printers')
-
-        if printer_id:
-            ref.document(printer_id).update({
-                'name': name, 'ip': ip, 'port': port,
-                'type': ptype, 'enabled': enabled,
-            })
-        else:
-            ref.add({
-                'name': name, 'ip': ip, 'port': port,
-                'type': ptype, 'enabled': enabled,
-                'createdAt': firestore.SERVER_TIMESTAMP,
-            })
-        return JsonResponse({'ok': True})
-
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
+@login_required
+@csrf_exempt
+def printer_update(request, printer_id):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+    data = json.loads(request.body)
+    db = get_db(); rid = get_restaurant_id(request)
+    db.collection('restaurants').document(rid).collection('printers').document(printer_id).update({
+        'name': data.get('name', ''),
+        'ip':   data.get('ip', ''),
+        'port': int(data.get('port', 9100)),
+        'role': data.get('role', 'cashier'),
+    })
+    return JsonResponse({'ok': True})
 
 @login_required
 @csrf_exempt
 def printer_delete(request, printer_id):
     if request.method != 'DELETE':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-    db  = get_db()
-    rid = get_restaurant_id(request)
+    db = get_db(); rid = get_restaurant_id(request)
     db.collection('restaurants').document(rid).collection('printers').document(printer_id).delete()
     return JsonResponse({'ok': True})
 
 @login_required
 @csrf_exempt
-def printer_test(request):
-    """Тестовая печать — проверяем соединение с принтером"""
+def printer_test(request, printer_id):
+    """Отправляет тестовый ESC/POS чек на принтер"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-    import socket
-    data = json.loads(request.body)
-    ip   = data.get('ip', '')
-    port = int(data.get('port', 9100))
+    db = get_db(); rid = get_restaurant_id(request)
+    doc = db.collection('restaurants').document(rid).collection('printers').document(printer_id).get()
+    if not doc.exists:
+        return JsonResponse({'error': 'Принтер не найден'}, status=404)
+    p = doc.to_dict()
+    ip   = p.get('ip', '')
+    port = int(p.get('port', 9100))
+    name = p.get('name', 'Принтер')
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(3)
-        s.connect((ip, port))
-        # ESC/POS test print
-        ESC = b'\x1b'
-        test_data  = ESC + b'@'          # Init
-        test_data += ESC + b'a\x01'     # Center
-        test_data += b'ELCHIGO\n'
-        test_data += b'Test Print OK\n'
-        test_data += b'\n\n\n'
-        test_data += b'\x1d\x56\x41'  # Cut
-        s.sendall(test_data)
-        s.close()
-        return JsonResponse({'ok': True, 'message': 'Принтер отвечает!'})
+        ESC      = b'\x1b'
+        INIT     = ESC + b'@'
+        BOLD_ON  = ESC + b'\x45\x01'
+        BOLD_OFF = ESC + b'\x45\x00'
+        CENTER   = ESC + b'\x61\x01'
+        LEFT     = ESC + b'\x61\x00'
+        CUT      = b'\x1d\x56\x41\x03'
+
+        rest_name = request.session.get('restaurant_name', 'ELCHIGO')
+        now_str   = datetime.now().strftime('%d.%m.%Y %H:%M')
+
+        payload = (
+            INIT +
+            CENTER + BOLD_ON +
+            f'{rest_name}\n'.encode('cp866', errors='replace') +
+            BOLD_OFF +
+            '--- ТЕСТОВЫЙ ЧЕК ---\n'.encode('cp866', errors='replace') +
+            LEFT +
+            f'Принтер: {name}\n'.encode('cp866', errors='replace') +
+            f'IP: {ip}:{port}\n'.encode('cp866', errors='replace') +
+            f'Дата: {now_str}\n'.encode('cp866', errors='replace') +
+            b'--------------------------------\n' +
+            CENTER +
+            'Принтер работает!\n'.encode('cp866', errors='replace') +
+            b'\n\n\n' +
+            CUT
+        )
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        sock.connect((ip, port))
+        sock.sendall(payload)
+        sock.close()
+        return JsonResponse({'ok': True})
     except Exception as e:
-        return JsonResponse({'ok': False, 'message': f'Ошибка: {str(e)}'}, status=400)
+        logger.error(f"Printer test error: {e}")
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
 
-# ─── PRINTERS ─────────────────────────────────────────────────────────────────
+# ─── RECEIPT SETTINGS ─────────────────────────────────────────────────────────
 
 @login_required
-def printers(request):
-    return render(request, 'printers/index.html', {
+def receipt_settings_view(request):
+    return render(request, 'printers/receipt_settings.html', {
         'restaurant_name': request.session.get('restaurant_name', ''),
     })
 
 @login_required
 @csrf_exempt
-def printers_api(request):
-    db  = get_db()
-    rid = get_restaurant_id(request)
-
+def receipt_settings_api(request):
+    db = get_db(); rid = get_restaurant_id(request)
     if request.method == 'GET':
-        printers_list = []
-        for doc in db.collection('restaurants').document(rid).collection('printers').stream():
-            p = doc.to_dict()
-            p['id'] = doc.id
-            printers_list.append(p)
-        return JsonResponse({'printers': printers_list})
-
+        doc = db.collection('restaurants').document(rid).get()
+        data = doc.to_dict() if doc.exists else {}
+        return JsonResponse({'settings': data.get('receiptSettings', {})})
     if request.method == 'POST':
-        data    = json.loads(request.body)
-        name    = data.get('name', '').strip()
-        ip      = data.get('ip', '').strip()
-        port    = int(data.get('port', 9100))
-        ptype   = data.get('type', 'cashier')
-        enabled = data.get('enabled', True)
-
-        if not name or not ip:
-            return JsonResponse({'error': 'Название и IP обязательны'}, status=400)
-
-        ref = db.collection('restaurants').document(rid).collection('printers')
-        printer_id = data.get('id', '')
-        if printer_id:
-            ref.document(printer_id).update({
-                'name': name, 'ip': ip, 'port': port,
-                'type': ptype, 'enabled': enabled,
-            })
-        else:
-            ref.add({
-                'name': name, 'ip': ip, 'port': port,
-                'type': ptype, 'enabled': enabled,
-                'createdAt': firestore.SERVER_TIMESTAMP,
-            })
+        data = json.loads(request.body)
+        db.collection('restaurants').document(rid).update({'receiptSettings': data})
         return JsonResponse({'ok': True})
-
     return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-
-@login_required
-@csrf_exempt
-def printer_delete(request, printer_id):
-    if request.method != 'DELETE':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    db  = get_db()
-    rid = get_restaurant_id(request)
-    db.collection('restaurants').document(rid).collection('printers').document(printer_id).delete()
-    return JsonResponse({'ok': True})
-
-
-@login_required
-@csrf_exempt
-def printer_test(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
-    import socket
-    data = json.loads(request.body)
-    ip   = data.get('ip', '')
-    port = int(data.get('port', 9100))
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(3)
-        s.connect((ip, port))
-        ESC = b'\x1b'
-        test_data  = ESC + b'@'
-        test_data += ESC + b'a\x01'
-        test_data += b'ELCHIGO\n'
-        test_data += b'Test Print OK\n'
-        test_data += b'\n\n\n'
-        test_data += b'\x1d\x56\x41'
-        s.sendall(test_data)
-        s.close()
-        return JsonResponse({'ok': True, 'message': 'Принтер отвечает!'})
-    except Exception as e:
-        return JsonResponse({'ok': False, 'message': f'Ошибка: {str(e)}'}, status=400)
