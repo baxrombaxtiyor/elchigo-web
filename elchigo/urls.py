@@ -66,4 +66,7 @@ urlpatterns = [
     path('printers/<str:printer_id>/update/',     views.printer_update,       name='printer_update'),
     path('printers/<str:printer_id>/delete/',     views.printer_delete,       name='printer_delete'),
     path('printers/<str:printer_id>/test/',       views.printer_test,         name='printer_test'),
+
+    path('printers/print-receipt/', views.print_receipt, name='print_receipt'),
+    path('printers/print-kitchen/', views.print_kitchen, name='print_kitchen'),
 ]

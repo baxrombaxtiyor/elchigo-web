@@ -889,3 +889,268 @@ def receipt_settings_api(request):
         db.collection('restaurants').document(rid).update({'receiptSettings': data})
         return JsonResponse({'ok': True})
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+def _escpos_receipt(data: dict) -> bytes:
+    """Генерирует ESC/POS байты для кассового чека."""
+    ESC   = b'\x1b'
+    GS    = b'\x1d'
+    INIT  = ESC + b'@'           # инициализация
+    LF    = b'\n'
+    CENTER = ESC + b'\x61\x01'
+    LEFT   = ESC + b'\x61\x00'
+    RIGHT  = ESC + b'\x61\x02'
+    BOLD_ON  = ESC + b'\x45\x01'
+    BOLD_OFF = ESC + b'\x45\x00'
+    SIZE_BIG   = GS + b'\x21\x11'  # двойной размер
+    SIZE_NORMAL= GS + b'\x21\x00'
+    CUT   = GS + b'\x56\x41\x05'  # частичный отрез
+ 
+    def line(text='', align='left', bold=False, big=False, encoding='cp866'):
+        out = b''
+        if align == 'center': out += CENTER
+        elif align == 'right': out += RIGHT
+        else: out += LEFT
+        if big: out += SIZE_BIG
+        if bold: out += BOLD_ON
+        out += text.encode(encoding, errors='replace') + LF
+        if bold: out += BOLD_OFF
+        if big: out += SIZE_NORMAL
+        out += LEFT
+        return out
+ 
+    def divider(char='-', width=42):
+        return LEFT + (char * width).encode('cp866') + LF
+ 
+    def row(left_text, right_text, width=42):
+        """Строка с текстом слева и суммой справа."""
+        right = right_text[:12]
+        left  = left_text[:width - len(right) - 1]
+        spaces = width - len(left) - len(right)
+        text  = left + ' ' * max(1, spaces) + right
+        return LEFT + text.encode('cp866', errors='replace') + LF
+ 
+    restaurant = data.get('restaurant_name', 'RESTAURANT')
+    table      = data.get('table_number', '?')
+    cashier    = data.get('cashier_name', '')
+    items      = data.get('items', [])
+    total      = float(data.get('total', 0))
+    paid       = float(data.get('paid', total))
+    change     = float(data.get('change', 0))
+    method     = data.get('payment_method', '')
+    dt_str     = data.get('datetime', '')
+    try:
+        dt = datetime.fromisoformat(dt_str)
+        dt_formatted = dt.strftime('%d.%m.%Y  %H:%M')
+    except Exception:
+        dt_formatted = dt_str
+ 
+    out = INIT
+    out += line()
+    out += line(restaurant.upper(), align='center', bold=True, big=True)
+    out += line('KASSA CHEKI', align='center')
+    out += line()
+    out += divider()
+    out += row(f'Stol: {table}', dt_formatted)
+    if cashier:
+        out += line(f'Kassir: {cashier}')
+    out += divider()
+ 
+    # Заголовок таблицы
+    out += LEFT + 'Nomi                  Soni    Narx'.encode('cp866') + LF
+    out += divider()
+ 
+    # Позиции
+    for item in items:
+        name  = str(item.get('name', ''))[:20]
+        qty   = int(item.get('quantity', 1))
+        price = float(item.get('price', 0))
+        total_item = float(item.get('total', price * qty))
+        # Строка: название (20) | кол-во (4) | сумма
+        name_padded = name.ljust(20)
+        qty_str     = str(qty).rjust(4)
+        total_str   = f'{total_item:,.0f}'.replace(',', ' ')
+        text = f'{name_padded}{qty_str}  {total_str}'
+        out += LEFT + text.encode('cp866', errors='replace') + LF
+ 
+    out += divider('=')
+    out += row('JAMI:', f'{total:,.0f}'.replace(',', ' '))
+    if paid > total:
+        out += row('Tolov:', f'{paid:,.0f}'.replace(',', ' '))
+        out += row('Qaytim:', f'{change:,.0f}'.replace(',', ' '))
+    out += divider()
+    out += line(method, align='center', bold=True)
+    out += divider()
+    out += line()
+    out += line('Xaridingiz uchun rahmat!', align='center', bold=True)
+    out += line('Yana keling :)', align='center')
+    out += line()
+    out += line()
+    out += line()
+    out += CUT
+ 
+    return out
+ 
+ 
+def _escpos_kitchen(data: dict) -> bytes:
+    """Генерирует ESC/POS байты для кухонного чека."""
+    ESC  = b'\x1b'
+    GS   = b'\x1d'
+    INIT = ESC + b'@'
+    LF   = b'\n'
+    CENTER  = ESC + b'\x61\x01'
+    LEFT    = ESC + b'\x61\x00'
+    BOLD_ON  = ESC + b'\x45\x01'
+    BOLD_OFF = ESC + b'\x45\x00'
+    SIZE_BIG    = GS + b'\x21\x11'
+    SIZE_NORMAL = GS + b'\x21\x00'
+    CUT = GS + b'\x56\x41\x05'
+ 
+    table       = data.get('table_number', '?')
+    order_type  = data.get('order_type', 'table')
+    waiter_name = data.get('waiter_name', '')
+    comment     = data.get('comment', '')
+    items       = data.get('items', [])
+    dt_str      = data.get('datetime', '')
+    try:
+        dt = datetime.fromisoformat(dt_str)
+        dt_formatted = dt.strftime('%H:%M  %d.%m.%Y')
+    except Exception:
+        dt_formatted = dt_str
+ 
+    type_labels = {
+        'table':    'STOL',
+        'takeaway': 'OLIB KETISH',
+        'delivery': 'YETKAZIB BERISH',
+    }
+    type_label = type_labels.get(order_type, order_type.upper())
+ 
+    out = INIT
+    out += CENTER + SIZE_BIG + BOLD_ON
+    out += f'BUYURTMA\n'.encode('cp866')
+    out += BOLD_OFF + SIZE_NORMAL
+ 
+    out += CENTER + BOLD_ON
+    out += f'Stol: {table}\n'.encode('cp866')
+    out += BOLD_OFF
+ 
+    out += CENTER
+    out += f'{type_label}\n'.encode('cp866')
+    out += LEFT
+    out += f'{dt_formatted}\n'.encode('cp866')
+    if waiter_name:
+        out += f'Ofitsiant: {waiter_name}\n'.encode('cp866', errors='replace')
+    out += b'=' * 32 + LF
+ 
+    # Позиции — крупный шрифт
+    for item in items:
+        name = str(item.get('name', ''))
+        qty  = int(item.get('quantity', 1))
+        out += SIZE_BIG + BOLD_ON
+        out += f'{qty}x  '.encode('cp866')
+        out += BOLD_OFF + SIZE_NORMAL
+        out += name.encode('cp866', errors='replace') + LF
+ 
+    out += b'-' * 32 + LF
+    if comment:
+        out += LEFT + BOLD_ON
+        out += f'Izoh: {comment}'.encode('cp866', errors='replace') + LF
+        out += BOLD_OFF
+    out += LF + LF + LF
+    out += CUT
+ 
+    return out
+ 
+ 
+def _send_to_printer(ip: str, port: int, data: bytes, timeout: int = 5):
+    """Отправляет байты на принтер по TCP."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+    try:
+        sock.connect((ip, port))
+        sock.sendall(data)
+    finally:
+        sock.close()
+ 
+ 
+# ── View: печать кассового чека ───────────────────────────────────────────────
+@csrf_exempt
+def print_receipt(request):
+    """
+    POST /printers/print-receipt/
+    Body: {
+        printer_ip, printer_port,
+        restaurant_name, table_number, cashier_name,
+        items: [{name, quantity, price, total}],
+        total, paid, change, payment_method, datetime
+    }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+ 
+    try:
+        data       = json.loads(request.body)
+        ip         = data.get('printer_ip', '')
+        port       = int(data.get('printer_port', 9100))
+ 
+        if not ip:
+            return JsonResponse({'error': 'IP принтера не указан'}, status=400)
+ 
+        escpos_data = _escpos_receipt(data)
+        _send_to_printer(ip, port, escpos_data)
+        return JsonResponse({'ok': True, 'message': 'Чек отправлен на принтер'})
+ 
+    except socket.timeout:
+        return JsonResponse(
+            {'error': f'Принтер недоступен (timeout). Проверьте IP и сеть'},
+            status=503)
+    except ConnectionRefusedError:
+        return JsonResponse(
+            {'error': 'Соединение отклонено. Проверьте IP и порт принтера'},
+            status=503)
+    except OSError as e:
+        return JsonResponse({'error': f'Ошибка сети: {e}'}, status=503)
+    except Exception as e:
+        logger.error(f'print_receipt error: {e}')
+        return JsonResponse({'error': str(e)}, status=500)
+ 
+ 
+# ── View: печать кухонного заказа ─────────────────────────────────────────────
+@csrf_exempt
+def print_kitchen(request):
+    """
+    POST /printers/print-kitchen/
+    Body: {
+        printer_ip, printer_port,
+        table_number, order_type,
+        items: [{name, quantity}],
+        datetime
+    }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+ 
+    try:
+        data  = json.loads(request.body)
+        ip    = data.get('printer_ip', '')
+        port  = int(data.get('printer_port', 9100))
+ 
+        if not ip:
+            return JsonResponse({'error': 'IP принтера не указан'}, status=400)
+ 
+        escpos_data = _escpos_kitchen(data)
+        _send_to_printer(ip, port, escpos_data)
+        return JsonResponse({'ok': True, 'message': 'Заказ отправлен на кухню'})
+ 
+    except socket.timeout:
+        return JsonResponse(
+            {'error': 'Принтер кухни недоступен (timeout)'},
+            status=503)
+    except ConnectionRefusedError:
+        return JsonResponse(
+            {'error': 'Соединение с принтером кухни отклонено'},
+            status=503)
+    except OSError as e:
+        return JsonResponse({'error': f'Ошибка сети: {e}'}, status=503)
+    except Exception as e:
+        logger.error(f'print_kitchen error: {e}')
+        return JsonResponse({'error': str(e)}, status=500)
+ 
