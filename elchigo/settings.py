@@ -9,7 +9,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-elchigo-change-in-production')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = ['*']
-
+PRINT_AGENT_URL = 'http://192.168.100.100:5000'  # IP твоего компьютера
 INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'elchigo',
