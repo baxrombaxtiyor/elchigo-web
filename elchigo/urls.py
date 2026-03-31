@@ -19,7 +19,7 @@ urlpatterns = [
     path('menu/dish/<str:cat_id>/<str:dish_id>/availability/', views.update_dish_availability, name='update_dish_availability'),
     path('menu/<str:restaurant_id>/<str:table_id>/',     views.customer_menu,   name='customer_menu'),
 
-    # Tables — статичные маршруты ПЕРЕД динамическими
+    # Tables
     path('tables/',                          views.tables,                name='tables'),
     path('tables/add/',                      views.add_table,             name='add_table'),
     path('tables/categories/',               views.table_categories,      name='table_categories'),
@@ -38,8 +38,9 @@ urlpatterns = [
     path('reports/z/',       views.z_report,      name='z_report'),
     path('reports/z-close/', views.z_report_close,name='z_report_close'),
 
-    path('settings/',          views.restaurant_settings, name='settings'),
-    path('settings/payments/', views.payment_methods_api, name='payment_methods_api'),
+    path('settings/',              views.restaurant_settings, name='settings'),
+    path('settings/payments/',     views.payment_methods_api, name='payment_methods_api'),
+    path('settings/printer-url/',  views.printer_url_api,     name='printer_url_api'),  # ← новый
 
     path('staff/',                  views.staff,        name='staff'),
     path('staff/api/',              views.staff_api,    name='staff_api'),
@@ -56,7 +57,7 @@ urlpatterns = [
     path('finance/categories/',                       views.finance_categories,     name='finance_categories'),
     path('finance/categories/delete/',                views.finance_category_delete,name='finance_category_delete'),
 
-    # Printers — статичные ПЕРЕД динамическими
+    # Printers
     path('printers/',                             views.printers,             name='printers'),
     path('printers/api/',                         views.printers_api,         name='printers_api'),
     path('printers/add/',                         views.printer_add,          name='printer_add'),

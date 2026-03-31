@@ -584,6 +584,21 @@ def payment_methods_api(request):
         return JsonResponse({'ok': True})
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+@login_required
+def printer_url_api(request):
+    db = get_db(); rid = get_restaurant_id(request)
+    if request.method == 'GET':
+        doc = db.collection('restaurants').document(rid).get()
+        data = doc.to_dict() if doc.exists else {}
+        return JsonResponse({'url': data.get('printAgentUrl', '')})
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        db.collection('restaurants').document(rid).update({
+            'printAgentUrl': data.get('url', '')
+        })
+        return JsonResponse({'ok': True})
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
 
 # ─── STAFF ────────────────────────────────────────────────────────────────────
 

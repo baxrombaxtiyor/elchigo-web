@@ -80,8 +80,11 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
 .pwd-eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);
   background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:0}
 
-/* Notifications */
-.notif-list{display:flex;flex-direction:column;gap:0}
+/* Printer status */
+.printer-status-box{padding:12px 16px;border-radius:10px;font-size:13px;font-weight:600;margin-top:12px}
+.printer-status-box.ok{background:#22A06B10;border:1px solid #22A06B30;color:#22A06B}
+.printer-status-box.err{background:#CC000010;border:1px solid #CC000030;color:#8B0000}
+.printer-status-box.loading{background:#f0f0f0;border:1px solid #ddd;color:#666}
 </style>
 {% endblock %}
 
@@ -109,6 +112,14 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
       </svg>
       Настройка чека
     </div>
+    <div class="settings-nav-item" onclick="showSection('printer',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 9 6 2 18 2 18 9"/>
+        <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Принтер
+    </div>
     <div class="settings-nav-item" onclick="showSection('notifications',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
@@ -131,7 +142,6 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
       <div class="section-title">Основное</div>
       <div class="section-sub">Название, статус и расписание ресторана</div>
 
-      <!-- Статус -->
       <div class="setting-card">
         <div class="setting-card-header">Статус ресторана</div>
         <div class="setting-card-body">
@@ -154,7 +164,6 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
         </div>
       </div>
 
-      <!-- Название -->
       <div class="setting-card">
         <div class="setting-card-header">Название ресторана</div>
         <div class="setting-card-body">
@@ -166,7 +175,6 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
         </div>
       </div>
 
-      <!-- Расписание -->
       <div class="setting-card">
         <div class="setting-card-header">Расписание работы</div>
         <div class="setting-card-body" id="schedule-body" style="padding:12px 18px"></div>
@@ -234,7 +242,7 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
               <div class="form-group">
                 <label class="form-label">Подзаголовок</label>
                 <input class="form-input" id="receipt-subtitle"
-                  placeholder="Choyhona & Restaurant" id="receipt-subtitle">
+                  placeholder="Choyhona & Restaurant">
               </div>
               <div class="form-group">
                 <label class="form-label">Адрес</label>
@@ -259,45 +267,8 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
               </div>
             </div>
           </div>
-
-          <div class="setting-card">
-            <div class="setting-card-header">Что показывать в чеке</div>
-            <div class="setting-card-body">
-              <div class="setting-row">
-                <div class="setting-row-info">
-                  <div class="sr-title">Имя официанта</div>
-                  <div class="sr-sub">Показывать имя официанта в чеке</div>
-                </div>
-                <label class="toggle">
-                  <input type="checkbox" id="show-waiter" checked>
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-              <div class="setting-row">
-                <div class="setting-row-info">
-                  <div class="sr-title">Имя кассира</div>
-                  <div class="sr-sub">Показывать имя кассира в чеке</div>
-                </div>
-                <label class="toggle">
-                  <input type="checkbox" id="show-cashier" checked>
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-              <div class="setting-row">
-                <div class="setting-row-info">
-                  <div class="sr-title">QR-код</div>
-                  <div class="sr-sub">Добавить QR-код в чек</div>
-                </div>
-                <label class="toggle">
-                  <input type="checkbox" id="show-qr" onchange="updatePreview()">
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <!-- Preview -->
         <div style="position:sticky;top:20px">
           <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:8px;font-weight:600">ПРЕДПРОСМОТР</div>
           <div class="receipt-preview" id="receipt-preview">
@@ -308,23 +279,69 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
             <div class="rp-line"></div>
             <div class="rp-row"><span>Стол</span><span>5</span></div>
             <div class="rp-row"><span>Официант</span><span>Алишер</span></div>
-            <div class="rp-row"><span>Кассир</span><span>Баходир</span></div>
-            <div class="rp-row"><span>Дата</span><span>16.03.2026</span></div>
             <div class="rp-line"></div>
             <div class="rp-row"><span>Плов</span><span></span></div>
             <div class="rp-row"><span style="color:#888">1 × 45000</span><span>45 000</span></div>
-            <div class="rp-row"><span>Лагман</span><span></span></div>
-            <div class="rp-row"><span style="color:#888">2 × 35000</span><span>70 000</span></div>
             <div class="rp-line"></div>
-            <div class="rp-row" style="font-weight:900"><span>ИТОГО</span><span>115 000 сум</span></div>
+            <div class="rp-row" style="font-weight:900"><span>ИТОГО</span><span>45 000 сум</span></div>
             <div class="rp-line"></div>
             <div class="rp-center" style="color:#888;font-size:11px" id="prev-footer">Рахмат! Яна келинг 🙏</div>
-            <div class="rp-center" style="color:#ccc;font-size:10px;margin-top:4px">— — —</div>
           </div>
           <button class="btn btn-outline" onclick="saveReceipt()"
             style="width:100%;justify-content:center;margin-top:12px">
             Сохранить
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ПРИНТЕР ── -->
+    <div class="settings-section" id="section-printer">
+      <div class="section-title">Настройка принтера</div>
+      <div class="section-sub">URL локального агента печати — доступен из любой сети</div>
+
+      <div class="setting-card">
+        <div class="setting-card-header">🖨️ Агент печати</div>
+        <div class="setting-card-body">
+
+          <div class="form-group">
+            <label class="form-label">URL агента печати</label>
+            <input class="form-input" id="print-agent-url"
+              placeholder="https://xxx.ngrok-free.app или http://192.168.100.100:5000">
+            <div style="font-size:12px;color:var(--muted);margin-top:6px">
+              Запустите <code>print_agent.py</code> на компьютере с принтером.<br>
+              Если принтер только в локальной сети — используйте IP.<br>
+              Если нужен доступ из любой сети — используйте ngrok или cloudflare URL.
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="testPrinterAgent()">
+              🔍 Проверить соединение
+            </button>
+            <button class="btn btn-outline" onclick="testPrintKitchen()">
+              🖨️ Тест кухонного чека
+            </button>
+            <button class="btn btn-primary" onclick="savePrinterUrl()">
+              💾 Сохранить URL
+            </button>
+          </div>
+
+          <div id="printer-status" style="display:none;margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div class="setting-card">
+        <div class="setting-card-header">📋 Инструкция</div>
+        <div class="setting-card-body">
+          <ol style="font-size:13px;color:var(--muted);line-height:2;padding-left:18px">
+            <li>Скачайте <code>print_agent.py</code> и <code>start_print_server.bat</code></li>
+            <li>Положите в папку <code>C:\elchigo_print\</code></li>
+            <li>Запустите <code>start_print_server.bat</code></li>
+            <li>Для доступа из любой сети запустите: <code>ngrok http 5000</code></li>
+            <li>Скопируйте URL и вставьте выше</li>
+            <li>Нажмите "Сохранить URL"</li>
+          </ol>
         </div>
       </div>
     </div>
@@ -370,48 +387,6 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
         </div>
       </div>
 
-      <div class="setting-card">
-        <div class="setting-card-header">Вызовы официанта</div>
-        <div class="setting-card-body">
-          <div class="setting-row">
-            <div class="setting-row-info">
-              <div class="sr-title">Вызов официанта</div>
-              <div class="sr-sub">Клиент нажал кнопку вызова</div>
-            </div>
-            <label class="toggle">
-              <input type="checkbox" id="notif-waiter-call" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-          <div class="setting-row">
-            <div class="setting-row-info">
-              <div class="sr-title">Запрос счёта</div>
-              <div class="sr-sub">Клиент просит счёт</div>
-            </div>
-            <label class="toggle">
-              <input type="checkbox" id="notif-bill" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div class="setting-card">
-        <div class="setting-card-header">Звук уведомлений</div>
-        <div class="setting-card-body">
-          <div class="setting-row">
-            <div class="setting-row-info">
-              <div class="sr-title">Звук при новом заказе</div>
-              <div class="sr-sub">Воспроизводить звук при получении заказа</div>
-            </div>
-            <label class="toggle">
-              <input type="checkbox" id="notif-sound" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
       <button class="btn btn-primary" onclick="saveNotifications()"
         style="width:100%;justify-content:center;padding:14px">
         Сохранить уведомления
@@ -450,22 +425,6 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
         </div>
       </div>
 
-      <div class="setting-card">
-        <div class="setting-card-header">Сессия</div>
-        <div class="setting-card-body">
-          <div class="setting-row">
-            <div class="setting-row-info">
-              <div class="sr-title">Автовыход</div>
-              <div class="sr-sub">Выходить из системы через 8 часов неактивности</div>
-            </div>
-            <label class="toggle">
-              <input type="checkbox" id="auto-logout" checked>
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
       <div id="pwd-error" style="display:none;background:#CC000010;border:1px solid #CC000030;
         color:#8B0000;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:14px"></div>
       <div id="pwd-success" style="display:none;background:#22A06B10;border:1px solid #22A06B30;
@@ -483,12 +442,10 @@ input:checked+.toggle-slider:before{transform:translateX(20px)}
 
 {% block extra_js %}
 <script>
-// Fix Python True/False -> JS true/false
 if (typeof True  === 'undefined') var True  = true;
 if (typeof False === 'undefined') var False = false;
 if (typeof None  === 'undefined') var None  = null;
 
-// ── Navigation ────────────────────────────────────────────────────
 function showSection(name, el) {
   document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
@@ -496,9 +453,8 @@ function showSection(name, el) {
   el.classList.add('active');
 }
 
-// ── Schedule ──────────────────────────────────────────────────────
 const dayNames      = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
-const savedSchedule = {{ restaurant.schedule|default:"[]"|safe|safe }};
+const savedSchedule = {{ restaurant.schedule|default:"[]"|safe }};
 
 (function buildSchedule() {
   const body = document.getElementById('schedule-body');
@@ -517,68 +473,49 @@ const savedSchedule = {{ restaurant.schedule|default:"[]"|safe|safe }};
   }).join('');
 })();
 
-// ── Status ────────────────────────────────────────────────────────
 function updateStatus() {
   const isOpen = document.getElementById('is-open').checked;
-  document.getElementById('status-title').textContent =
-    isOpen ? 'Ресторан открыт' : 'Ресторан закрыт';
-  document.getElementById('status-sub').textContent =
-    isOpen ? 'Клиенты могут делать заказы' : 'Заказы не принимаются';
+  document.getElementById('status-title').textContent = isOpen ? 'Ресторан открыт' : 'Ресторан закрыт';
+  document.getElementById('status-sub').textContent   = isOpen ? 'Клиенты могут делать заказы' : 'Заказы не принимаются';
 }
 
-// ── Save General ──────────────────────────────────────────────────
 async function saveGeneral() {
   const schedule = dayNames.map(function(_, i) {
     var en = document.querySelector('.day-enabled[data-i="' + i + '"]');
     var op = document.querySelector('.day-open[data-i="'    + i + '"]');
     var cl = document.querySelector('.day-close[data-i="'  + i + '"]');
-    return {
-      enabled: en ? en.checked      : false,
-      open:    op ? op.value        : '09:00',
-      close:   cl ? cl.value        : '22:00',
-    };
+    return { enabled: en ? en.checked : false, open: op ? op.value : '09:00', close: cl ? cl.value : '22:00' };
   });
   const r = await fetch('/settings/', {
-    method:  'POST',
+    method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
-    body: JSON.stringify({
-      name:     document.getElementById('rest-name').value,
-      isOpen:   document.getElementById('is-open').checked,
-      schedule,
-    }),
+    body: JSON.stringify({ name: document.getElementById('rest-name').value, isOpen: document.getElementById('is-open').checked, schedule }),
   });
   const d = await r.json();
   if (d.ok) showToast('✅ Настройки сохранены!', 'green');
   else showToast('Ошибка сохранения', 'red');
 }
 
-// ── Payment Methods ───────────────────────────────────────────────
-// ИСПРАВЛЕНИЕ: Добавляем определение DEFAULT_METHODS, чтобы избежать ReferenceError
 const DEFAULT_METHODS = [
-    {id: 'Terminal', label: 'Terminal', icon: '💳', enabled: true},
-    {id: 'Humo',     label: 'Humo',     icon: '🏦', enabled: true},
-    {id: 'Click',    label: 'Click',    icon: '📱', enabled: true},
-    {id: 'Payme',    label: 'Payme',    icon: '💜', enabled: true},
-    {id: 'UZCARD',   label: 'UZCARD',   icon: '🟦', enabled: true},
-    {id: 'Naqd',     label: 'Naqd',     icon: '💵', enabled: true},
+  {id:'Terminal',label:'Terminal',icon:'💳',enabled:true},
+  {id:'Humo',    label:'Humo',    icon:'🏦',enabled:true},
+  {id:'Click',   label:'Click',   icon:'📱',enabled:true},
+  {id:'Payme',   label:'Payme',   icon:'💜',enabled:true},
+  {id:'UZCARD',  label:'UZCARD',  icon:'🟦',enabled:true},
+  {id:'Naqd',    label:'Naqd',    icon:'💵',enabled:true},
 ];
-
 var paymentMethods = [];
 
 async function loadPaymentMethods() {
   try {
     const r = await fetch('/settings/payments/');
     const d = await r.json();
-    // Если в базе пусто, подставляем дефолтные
     paymentMethods = (d.methods && d.methods.length > 0) ? d.methods : DEFAULT_METHODS;
     renderPaymentMethods();
-  } catch(e) { 
-    console.error(e);
-    paymentMethods = DEFAULT_METHODS;
-    renderPaymentMethods();
-  }
+  } catch(e) { paymentMethods = DEFAULT_METHODS; renderPaymentMethods(); }
 }
 loadPaymentMethods();
+
 function addPaymentMethod() {
   const input = document.getElementById('new-payment-name');
   const name  = input.value.trim();
@@ -588,80 +525,44 @@ function addPaymentMethod() {
   renderPaymentMethods();
 }
 
-function removePaymentMethod(i) {
-  paymentMethods.splice(i, 1);
-  renderPaymentMethods();
-}
+function removePaymentMethod(i) { paymentMethods.splice(i, 1); renderPaymentMethods(); }
 
 async function savePayments() {
-  try {
-    const r = await fetch('/settings/payments/', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
-      body:    JSON.stringify({ methods: paymentMethods }),
-    });
-    const d = await r.json();
-    if (d.ok) showToast('✅ Способы оплаты сохранены!', 'green');
-    else      showToast('Ошибка: ' + (d.error || 'неизвестная'), 'red');
-  } catch(e) {
-    showToast('Ошибка сети', 'red');
-  }
+  const r = await fetch('/settings/payments/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+    body: JSON.stringify({ methods: paymentMethods }),
+  });
+  const d = await r.json();
+  if (d.ok) showToast('✅ Способы оплаты сохранены!', 'green');
+  else showToast('Ошибка', 'red');
 }
 
 function renderPaymentMethods() {
   const list = document.getElementById('payment-methods-list');
   if (!list) return;
-
   list.innerHTML = paymentMethods.map((m, i) => `
     <div class="setting-row">
       <div class="setting-row-info" style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:22px">${m.icon || '💰'}</span>
-        <div>
-          <div class="sr-title">${m.label}</div>
-        </div>
+        <span style="font-size:22px">${m.icon||'💰'}</span>
+        <div><div class="sr-title">${m.label}</div></div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <label class="toggle">
-          <input type="checkbox" ${m.enabled ? 'checked' : ''}
-            onchange="paymentMethods[${i}].enabled=this.checked">
+          <input type="checkbox" ${m.enabled?'checked':''} onchange="paymentMethods[${i}].enabled=this.checked">
           <span class="toggle-slider"></span>
         </label>
-        ${i >= DEFAULT_METHODS.length ? `
-          <button onclick="removePaymentMethod(${i})"
-            style="background:none;border:none;cursor:pointer;color:#CC0000;font-size:18px;padding:0 5px">×</button>` : ''}
+        ${i>=DEFAULT_METHODS.length?`<button onclick="removePaymentMethod(${i})" style="background:none;border:none;cursor:pointer;color:#CC0000;font-size:18px;padding:0 5px">×</button>`:''}
       </div>
     </div>`).join('');
 }
 
-// Добавьте пропущенную функцию showToast в самый конец скрипта, чтобы уведомления работали:
-function showToast(msg, color) {
-  const t = document.createElement('div');
-  t.textContent = msg;
-  t.style.position = 'fixed';
-  t.style.bottom = '20px';
-  t.style.right = '20px';
-  t.style.padding = '12px 20px';
-  t.style.borderRadius = '8px';
-  t.style.color = '#fff';
-  t.style.backgroundColor = color === 'green' ? '#22A06B' : '#CC0000';
-  t.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-  t.style.zIndex = '9999';
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3000);
-}
-
-// ── Receipt Preview ───────────────────────────────────────────────
 function updatePreview() {
-  document.getElementById('prev-name').textContent =
-    document.getElementById('receipt-name').value || 'РЕСТОРАН';
-  document.getElementById('prev-subtitle').textContent =
-    document.getElementById('receipt-subtitle').value;
-  document.getElementById('prev-address').textContent =
-    document.getElementById('receipt-address').value;
-  document.getElementById('prev-phone').textContent =
-    document.getElementById('receipt-phone').value;
-  document.getElementById('prev-footer').textContent =
-    document.getElementById('receipt-footer').value;
+  document.getElementById('prev-name').textContent     = document.getElementById('receipt-name').value || 'РЕСТОРАН';
+  document.getElementById('prev-subtitle').textContent = document.getElementById('receipt-subtitle').value;
+  document.getElementById('prev-address').textContent  = document.getElementById('receipt-address').value;
+  document.getElementById('prev-phone').textContent    = document.getElementById('receipt-phone').value;
+  document.getElementById('prev-footer').textContent   = document.getElementById('receipt-footer').value;
 }
 
 ['receipt-name','receipt-subtitle','receipt-address','receipt-phone','receipt-footer']
@@ -669,59 +570,119 @@ function updatePreview() {
 
 function saveReceipt() {
   const settings = {
-    name:       document.getElementById('receipt-name').value,
-    subtitle:   document.getElementById('receipt-subtitle').value,
-    address:    document.getElementById('receipt-address').value,
-    phone:      document.getElementById('receipt-phone').value,
-    footer:     document.getElementById('receipt-footer').value,
-    showWaiter: document.getElementById('show-waiter').checked,
-    showCashier:document.getElementById('show-cashier').checked,
-    showQr:     document.getElementById('show-qr').checked,
+    name:     document.getElementById('receipt-name').value,
+    subtitle: document.getElementById('receipt-subtitle').value,
+    address:  document.getElementById('receipt-address').value,
+    phone:    document.getElementById('receipt-phone').value,
+    footer:   document.getElementById('receipt-footer').value,
   };
   localStorage.setItem('receiptSettings', JSON.stringify(settings));
   showToast('✅ Настройки чека сохранены!', 'green');
 }
 
-// Загружаем сохранённые настройки чека
 (function loadReceiptSettings() {
   const s = JSON.parse(localStorage.getItem('receiptSettings') || '{}');
-  if (s.subtitle)   document.getElementById('receipt-subtitle').value  = s.subtitle;
-  if (s.address)    document.getElementById('receipt-address').value   = s.address;
-  if (s.phone)      document.getElementById('receipt-phone').value     = s.phone;
-  if (s.footer)     document.getElementById('receipt-footer').value    = s.footer;
-  if (s.showQr !== undefined)
-    document.getElementById('show-qr').checked = s.showQr;
+  if (s.subtitle) document.getElementById('receipt-subtitle').value = s.subtitle;
+  if (s.address)  document.getElementById('receipt-address').value  = s.address;
+  if (s.phone)    document.getElementById('receipt-phone').value    = s.phone;
+  if (s.footer)   document.getElementById('receipt-footer').value   = s.footer;
   updatePreview();
 })();
 
-// ── Notifications ─────────────────────────────────────────────────
+// ── Принтер ───────────────────────────────────────────────────────
+async function loadPrinterUrl() {
+  try {
+    const r = await fetch('/settings/printer-url/');
+    const d = await r.json();
+    if (d.url) document.getElementById('print-agent-url').value = d.url;
+  } catch(e) {}
+}
+loadPrinterUrl();
+
+async function savePrinterUrl() {
+  const url = document.getElementById('print-agent-url').value.trim();
+  if (!url) { showToast('Введите URL', 'red'); return; }
+  const r = await fetch('/settings/printer-url/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+    body: JSON.stringify({ url }),
+  });
+  const d = await r.json();
+  if (d.ok) showToast('✅ URL сохранён! Теперь все приложения будут использовать этот адрес.', 'green');
+  else showToast('Ошибка сохранения', 'red');
+}
+
+async function testPrinterAgent() {
+  const url = document.getElementById('print-agent-url').value.trim();
+  const status = document.getElementById('printer-status');
+  if (!url) { showToast('Введите URL', 'red'); return; }
+  status.style.display = 'block';
+  status.className = 'printer-status-box loading';
+  status.textContent = '⏳ Проверяем соединение...';
+  try {
+    const r = await fetch(url + '/test/');
+    const d = await r.json();
+    if (d.ok || d.status === 'ok') {
+      status.className = 'printer-status-box ok';
+      status.textContent = '✅ Агент доступен! Принтер: ' + (d.printer || 'подключён');
+    } else {
+      status.className = 'printer-status-box err';
+      status.textContent = '❌ Ошибка: ' + (d.message || 'неизвестная');
+    }
+  } catch(e) {
+    status.className = 'printer-status-box err';
+    status.textContent = '❌ Недоступен: ' + e.message;
+  }
+}
+
+async function testPrintKitchen() {
+  const url = document.getElementById('print-agent-url').value.trim();
+  const status = document.getElementById('printer-status');
+  if (!url) { showToast('Введите URL', 'red'); return; }
+  status.style.display = 'block';
+  status.className = 'printer-status-box loading';
+  status.textContent = '⏳ Отправляем тестовый чек...';
+  try {
+    const r = await fetch(url + '/print/kitchen/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        table_number: 'TEST',
+        waiter_name:  'Admin',
+        order_type:   'table',
+        comment:      'Тестовый чек из админки',
+        items: [{ name: 'Тест — принтер работает!', quantity: 1 }],
+        datetime: new Date().toISOString(),
+      }),
+    });
+    const d = await r.json();
+    if (d.status === 'ok') {
+      status.className = 'printer-status-box ok';
+      status.textContent = '✅ Тестовый чек напечатан!';
+    } else {
+      status.className = 'printer-status-box err';
+      status.textContent = '❌ Ошибка: ' + (d.message || 'неизвестная');
+    }
+  } catch(e) {
+    status.className = 'printer-status-box err';
+    status.textContent = '❌ Ошибка: ' + e.message;
+  }
+}
+
+// ── Уведомления ───────────────────────────────────────────────────
 function saveNotifications() {
-  const settings = {
-    newOrder:    document.getElementById('notif-new-order').checked,
-    orderReady:  document.getElementById('notif-order-ready').checked,
-    cancel:      document.getElementById('notif-cancel').checked,
-    waiterCall:  document.getElementById('notif-waiter-call').checked,
-    bill:        document.getElementById('notif-bill').checked,
-    sound:       document.getElementById('notif-sound').checked,
-  };
-  localStorage.setItem('notifSettings', JSON.stringify(settings));
+  localStorage.setItem('notifSettings', JSON.stringify({
+    newOrder:   document.getElementById('notif-new-order').checked,
+    orderReady: document.getElementById('notif-order-ready').checked,
+    cancel:     document.getElementById('notif-cancel').checked,
+  }));
   showToast('✅ Уведомления сохранены!', 'green');
 }
 
-(function loadNotifSettings() {
-  const s = JSON.parse(localStorage.getItem('notifSettings') || '{}');
-  if (s.newOrder   !== undefined) document.getElementById('notif-new-order').checked   = s.newOrder;
-  if (s.orderReady !== undefined) document.getElementById('notif-order-ready').checked = s.orderReady;
-  if (s.cancel     !== undefined) document.getElementById('notif-cancel').checked      = s.cancel;
-  if (s.waiterCall !== undefined) document.getElementById('notif-waiter-call').checked = s.waiterCall;
-  if (s.bill       !== undefined) document.getElementById('notif-bill').checked        = s.bill;
-  if (s.sound      !== undefined) document.getElementById('notif-sound').checked       = s.sound;
-})();
-
-// ── Security ──────────────────────────────────────────────────────
+// ── Безопасность ──────────────────────────────────────────────────
 function togglePwd(id) {
   const inp = document.getElementById(id);
-  inp.type  = inp.type === 'password' ? 'text' : 'password';
+  inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
 async function changePassword() {
@@ -730,42 +691,23 @@ async function changePassword() {
   const confirm = document.getElementById('pwd-confirm').value;
   const errEl   = document.getElementById('pwd-error');
   const okEl    = document.getElementById('pwd-success');
-
-  errEl.style.display = 'none';
-  okEl.style.display  = 'none';
-
-  if (!current || !newPwd || !confirm) {
-    errEl.textContent  = 'Заполните все поля';
-    errEl.style.display = 'block'; return;
-  }
-  if (newPwd.length < 8) {
-    errEl.textContent  = 'Пароль должен быть минимум 8 символов';
-    errEl.style.display = 'block'; return;
-  }
-  if (newPwd !== confirm) {
-    errEl.textContent  = 'Пароли не совпадают';
-    errEl.style.display = 'block'; return;
-  }
-
-  // Firebase Auth смена пароля через reauthentication
+  errEl.style.display = 'none'; okEl.style.display = 'none';
+  if (!current || !newPwd || !confirm) { errEl.textContent = 'Заполните все поля'; errEl.style.display = 'block'; return; }
+  if (newPwd.length < 8) { errEl.textContent = 'Пароль минимум 8 символов'; errEl.style.display = 'block'; return; }
+  if (newPwd !== confirm) { errEl.textContent = 'Пароли не совпадают'; errEl.style.display = 'block'; return; }
   try {
-    const { getAuth, reauthenticateWithCredential,
-            EmailAuthProvider, updatePassword } = await import(
-      'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
-    const auth = getAuth();
-    const user = auth.currentUser;
+    const { getAuth, reauthenticateWithCredential, EmailAuthProvider, updatePassword } =
+      await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
+    const auth = getAuth(); const user = auth.currentUser;
     const cred = EmailAuthProvider.credential(user.email, current);
     await reauthenticateWithCredential(user, cred);
     await updatePassword(user, newPwd);
-    okEl.textContent  = '✅ Пароль успешно изменён!';
-    okEl.style.display = 'block';
+    okEl.textContent = '✅ Пароль успешно изменён!'; okEl.style.display = 'block';
     document.getElementById('pwd-current').value = '';
     document.getElementById('pwd-new').value     = '';
     document.getElementById('pwd-confirm').value = '';
   } catch(e) {
-    errEl.textContent  = e.code === 'auth/wrong-password'
-      ? 'Неверный текущий пароль'
-      : 'Ошибка: ' + e.message;
+    errEl.textContent = e.code === 'auth/wrong-password' ? 'Неверный текущий пароль' : 'Ошибка: ' + e.message;
     errEl.style.display = 'block';
   }
 }
@@ -778,7 +720,7 @@ function getCookie(n) {
 
 function showToast(msg, color) {
   const t = document.createElement('div');
-  t.textContent   = msg;
+  t.textContent = msg;
   t.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;
     background:${color === 'green' ? '#22A06B' : '#CC0000'};color:#fff;
     padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;
