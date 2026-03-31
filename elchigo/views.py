@@ -19,17 +19,10 @@ FieldValue = firestore.SERVER_TIMESTAMP
 logger = logging.getLogger(__name__)
 
 # ─── ЛОКАЛЬНЫЙ АГЕНТ ПЕЧАТИ ───────────────────────────────────────────────────
-# URL локального агента на компьютере где стоит принтер
-# Измени на IP своего компьютера в сети (не принтера!)
-PRINT_AGENT_URL = getattr(settings, 'PRINT_AGENT_URL', 'http://192.168.100.100:5000')
+PRINT_AGENT_URL = getattr(settings, 'PRINT_AGENT_URL', 'http://192.168.100.101:5000')
 
 
 def _send_via_agent(endpoint: str, data: dict) -> dict:
-    """
-    Отправляет запрос на локальный агент печати.
-    endpoint: 'kitchen' или 'receipt'
-    Возвращает {'ok': True} или {'ok': False, 'error': '...'}
-    """
     try:
         url = f'{PRINT_AGENT_URL}/print/{endpoint}/'
         resp = http_requests.post(url, json=data, timeout=5)
@@ -37,7 +30,7 @@ def _send_via_agent(endpoint: str, data: dict) -> dict:
             return {'ok': True}
         return {'ok': False, 'error': resp.json().get('message', 'Ошибка агента')}
     except http_requests.exceptions.ConnectionError:
-        return {'ok': False, 'error': f'Агент печати недоступен. Запустите print_agent.py на компьютере с принтером ({PRINT_AGENT_URL})'}
+        return {'ok': False, 'error': f'Агент печати недоступен ({PRINT_AGENT_URL})'}
     except http_requests.exceptions.Timeout:
         return {'ok': False, 'error': 'Агент печати не отвечает (timeout)'}
     except Exception as e:
@@ -585,6 +578,7 @@ def payment_methods_api(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @login_required
+@csrf_exempt  # ← исправлено: добавлен csrf_exempt
 def printer_url_api(request):
     db = get_db(); rid = get_restaurant_id(request)
     if request.method == 'GET':
@@ -858,7 +852,6 @@ def printer_delete(request, printer_id):
 @login_required
 @csrf_exempt
 def printer_test(request, printer_id):
-    """Тест принтера — отправляет запрос через локальный агент"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     db = get_db(); rid = get_restaurant_id(request)
@@ -874,8 +867,6 @@ def printer_test(request, printer_id):
         'comment':      f'Тест принтера: {p.get("name")} | {now_str}',
         'items':        [{'name': 'Тестовый чек — принтер работает!', 'quantity': 1}],
         'datetime':     datetime.now().isoformat(),
-        'printer_ip':   p.get('ip', ''),
-        'printer_port': int(p.get('port', 9100)),
     })
     if result['ok']:
         return JsonResponse({'ok': True})
@@ -909,20 +900,10 @@ def receipt_settings_api(request):
 
 @csrf_exempt
 def print_receipt(request):
-    """
-    POST /printers/print-receipt/
-    Отправляет запрос на локальный агент, который печатает кассовый чек.
-    Body: {
-        restaurant_name, table_number, cashier_name,
-        items: [{name, quantity, price, total}],
-        total, paid, change, payment_method, datetime
-    }
-    """
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     try:
         data = json.loads(request.body)
-        # Добавляем текущее время если не передано
         if not data.get('datetime'):
             data['datetime'] = datetime.now().isoformat()
         result = _send_via_agent('receipt', data)
@@ -936,15 +917,6 @@ def print_receipt(request):
 
 @csrf_exempt
 def print_kitchen(request):
-    """
-    POST /printers/print-kitchen/
-    Отправляет запрос на локальный агент, который печатает кухонный чек.
-    Body: {
-        table_number, order_type, waiter_name,
-        items: [{name, quantity}],
-        comment, datetime
-    }
-    """
     if request.method != 'POST':
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     try:
